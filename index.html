@@ -521,13 +521,29 @@
       .chip, .more-btn { display: none; }
       .appt-dots { display: flex; }
 
-      /* Week view: horizontal scroll, no sticky header inside scroll */
-      .tgrid-header { position: static; min-width: 520px; }
-      .tgrid-body   { min-width: 520px; }
-      .tgrid-scroll { max-height: calc(100vh - 175px); overflow-x: hidden; }
-      .week-x-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      .tgrid-corner { width: 46px; }
-      .time-col     { width: 46px; }
+      /* Week view: single 2D scroll container — no nested scrolling */
+      .week-x-scroll {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        max-height: calc(100dvh - 130px);
+      }
+      .tgrid-scroll { overflow: visible; max-height: none; }
+      .tgrid-header {
+        position: sticky;
+        top: 0;
+        min-width: 580px;
+        z-index: 10;
+        background: #f9f4f0;
+      }
+      .tgrid-body   { min-width: 580px; }
+      .time-col {
+        position: sticky;
+        left: 0;
+        background: #fff;
+        z-index: 5;
+        width: 46px;
+      }
+      .tgrid-corner { width: 46px; background: #f9f4f0; }
       .time-label   { padding: 0 6px; font-size: 10px; }
       .tgrid-day-head .dnum { font-size: 16px; }
       .tgrid-day-head.today .dnum { width: 28px; height: 28px; font-size: 13px; }
