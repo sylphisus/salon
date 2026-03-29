@@ -707,6 +707,7 @@
     <select class="schedule-select" id="scheduleSelect" onchange="setOverlay(this.value)">
       <option value="none">None</option>
       <option>Emma</option>
+      <option>Uyen</option>
       <option>Sophia</option>
       <option>Olivia</option>
       <option>Mia</option>
@@ -756,6 +757,7 @@
           <label>Stylist</label>
           <select id="fStylist">
             <option value="Any">Any Available</option>
+            <option>Emma</option>
             <option>Uyen</option>
             <option>Sophia</option>
             <option>Olivia</option>
@@ -817,6 +819,7 @@
         <label>Stylist</label>
         <select id="availStylist" onchange="loadAvailForm()">
           <option>Emma</option>
+          <option>Uyen</option>
           <option>Sophia</option>
           <option>Olivia</option>
           <option>Mia</option>
@@ -855,9 +858,10 @@ const DAYS_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DAYS_LONG   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS      = ['January','February','March','April','May','June',
                      'July','August','September','October','November','December'];
-const STYLISTS    = ['Emma','Sophia','Olivia','Mia','Harper'];
+const STYLISTS    = ['Emma','Uyen','Sophia','Olivia','Mia','Harper'];
 
 const SVC_COLORS = {
+  'Head Spa':   { bg:'#ccfbf1', tx:'#0f766e', bd:'#2dd4bf' },
   Haircut:      { bg:'#dbeafe', tx:'#1e3a8a', bd:'#93c5fd' },
   Color:        { bg:'#fce7f3', tx:'#9d174d', bd:'#f9a8d4' },
   Highlights:   { bg:'#fef9c3', tx:'#713f12', bd:'#fde047' },
