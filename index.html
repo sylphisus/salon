@@ -568,6 +568,121 @@
       .btn-nav  { width: 36px; height: 36px; }
       .btn-save { padding: 11px 20px; font-size: 14px; }
       .btn-cancel, .btn-del { padding: 11px 16px; font-size: 14px; }
+
+      /* Schedule row on mobile */
+      .schedule-group { order: 6; width: 100%; justify-content: space-between; }
+      .btn-set-hours .hours-text { display: none; }
+    }
+
+    /* ── SCHEDULE OVERLAY ────────────────────────────────── */
+    .schedule-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .schedule-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #b09080;
+      white-space: nowrap;
+    }
+    .schedule-select {
+      height: 30px;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      padding: 0 8px;
+      font-size: 12px;
+      color: #7c4d3a;
+      background: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.13s;
+    }
+    .schedule-select:focus { outline: none; border-color: #7c4d3a; }
+
+    .btn-set-hours {
+      height: 30px;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      background: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #7c4d3a;
+      padding: 0 11px;
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.13s;
+      flex-shrink: 0;
+    }
+    .btn-set-hours:hover { background: #f5ede7; border-color: #c4835a; }
+
+    /* Availability shading on time grid */
+    .avail-shade {
+      position: absolute;
+      left: 0; right: 0;
+      pointer-events: none;
+      z-index: 4;
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(150,120,100,0.07),
+        rgba(150,120,100,0.07) 3px,
+        transparent 3px,
+        transparent 9px
+      );
+    }
+    .avail-shade.day-off {
+      background: rgba(150,120,100,0.1);
+    }
+
+    /* ── AVAILABILITY MODAL ──────────────────────────────── */
+    .avail-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .avail-table th {
+      font-size: 11px;
+      font-weight: 700;
+      color: #a09090;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 6px 10px 8px;
+      text-align: left;
+    }
+    .avail-table th:nth-child(2) { text-align: center; }
+    .avail-table td {
+      padding: 5px 10px;
+      border-top: 1px solid #f3ece6;
+      vertical-align: middle;
+    }
+    .avail-day-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: #2d2323;
+      min-width: 80px;
+    }
+    .avail-off-cell { text-align: center; }
+    .avail-off-cb {
+      width: 16px; height: 16px;
+      cursor: pointer;
+      accent-color: #7c4d3a;
+    }
+    .avail-time {
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 13px;
+      color: #2d2323;
+      font-family: inherit;
+      width: 96px;
+      transition: border-color 0.13s;
+    }
+    .avail-time:focus { outline: none; border-color: #7c4d3a; }
+    .avail-time:disabled { background: #f5f0ec; color: #c0a898; border-color: #ede4dd; }
+    .avail-sep { color: #b09080; font-size: 12px; padding: 0 4px; }
+    @media (max-width: 640px) {
+      .avail-table th:last-child, .avail-table td:last-child { display: none; }
+      .avail-time { width: 80px; }
     }
   </style>
 </head>
@@ -586,6 +701,21 @@
     <button class="btn-view" data-v="day"   onclick="setView('day')">Day</button>
     <button class="btn-view" data-v="week"  onclick="setView('week')">Week</button>
     <button class="btn-view active" data-v="month" onclick="setView('month')">Month</button>
+  </div>
+  <div class="schedule-group">
+    <span class="schedule-label">Schedule</span>
+    <select class="schedule-select" id="scheduleSelect" onchange="setOverlay(this.value)">
+      <option value="none">None</option>
+      <option>Emma</option>
+      <option>Sophia</option>
+      <option>Olivia</option>
+      <option>Mia</option>
+      <option>Harper</option>
+    </select>
+    <button class="btn-set-hours" onclick="openAvail()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <span class="hours-text">Set Hours</span>
+    </button>
   </div>
   <button class="btn-add" onclick="openNew()">&#43; <span class="add-text">New Appointment</span></button>
 </header>
@@ -675,6 +805,43 @@
   </div>
 </div>
 
+<!-- AVAILABILITY MODAL -->
+<div class="overlay" id="availModal" style="display:none" onclick="availModalClick(event)">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <h3>Employee Availability</h3>
+      <button class="btn-x" onclick="closeAvail()">&#215;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="margin-bottom:18px">
+        <label>Stylist</label>
+        <select id="availStylist" onchange="loadAvailForm()">
+          <option>Emma</option>
+          <option>Sophia</option>
+          <option>Olivia</option>
+          <option>Mia</option>
+          <option>Harper</option>
+        </select>
+      </div>
+      <table class="avail-table">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Off</th>
+            <th>Start</th>
+            <th>End</th>
+          </tr>
+        </thead>
+        <tbody id="availBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeAvail()">Cancel</button>
+      <button class="btn-save" id="availSaveBtn" onclick="saveAvail()">Save Hours</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ================================================================
@@ -688,6 +855,7 @@ const DAYS_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DAYS_LONG   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS      = ['January','February','March','April','May','June',
                      'July','August','September','October','November','December'];
+const STYLISTS    = ['Emma','Sophia','Olivia','Mia','Harper'];
 
 const SVC_COLORS = {
   Haircut:      { bg:'#dbeafe', tx:'#1e3a8a', bd:'#93c5fd' },
@@ -730,10 +898,12 @@ function fromRow(r) {
 // ================================================================
 // STATE
 // ================================================================
-let cur    = new Date();
-let view   = 'month';
-let appts  = [];
-let editId = null;
+let cur            = new Date();
+let view           = 'month';
+let appts          = [];
+let editId         = null;
+let overlayStylest = 'none';
+let availability   = {}; // { stylist: { "0": null, "1": {start,end}, ... } }
 
 // ================================================================
 // UTILS
@@ -901,7 +1071,7 @@ function renderWeek(wrap) {
     const apts = byDate(ymd(d)).map(a => weekAppt(a)).join('');
     const nl   = isToday(d) ? nowLine() : '';
 
-    return `<div class="day-col" style="height:${gh}px">${rows}${apts}${nl}</div>`;
+    return `<div class="day-col" style="height:${gh}px">${rows}${apts}${nl}${availOverlay(d.getDay())}</div>`;
   }).join('');
 
   wrap.innerHTML = `
@@ -987,7 +1157,7 @@ function renderDay(wrap) {
           <div class="time-col">${timeLabels}</div>
           <div class="days-area">
             <div class="day-col" style="height:${gh}px;position:relative">
-              ${rows}${apts}${nl}${emptyState}
+              ${rows}${apts}${nl}${emptyState}${availOverlay(cur.getDay())}
             </div>
           </div>
         </div>
@@ -1131,6 +1301,118 @@ async function deleteAppt() {
 }
 
 // ================================================================
+// AVAILABILITY OVERLAY
+// ================================================================
+function setOverlay(val) {
+  overlayStylest = val;
+  render();
+}
+
+function availOverlay(dayOfWeek) {
+  if (overlayStylest === 'none') return '';
+  const hours = availability[overlayStylest];
+  if (!hours) return '';
+  const dayHours = hours[String(dayOfWeek)];
+  const gh = (HOUR_END - HOUR_START) * HOUR_H;
+
+  // Full day off
+  if (dayHours === null || dayHours === undefined) {
+    return `<div class="avail-shade day-off" style="top:0;height:${gh}px" title="${overlayStylest} — day off"></div>`;
+  }
+
+  const gridS = HOUR_START * 60;
+  const gridE = HOUR_END   * 60;
+  const [sh, sm] = dayHours.start.split(':').map(Number);
+  const [eh, em] = dayHours.end.split(':').map(Number);
+  const startM = sh * 60 + sm;
+  const endM   = eh * 60 + em;
+  let html = '';
+
+  if (startM > gridS) {
+    const h = ((startM - gridS) / 60) * HOUR_H;
+    html += `<div class="avail-shade" style="top:0;height:${h}px"></div>`;
+  }
+  if (endM < gridE) {
+    const top = ((endM - gridS) / 60) * HOUR_H;
+    const h   = ((gridE - endM) / 60) * HOUR_H;
+    html += `<div class="avail-shade" style="top:${top}px;height:${h}px"></div>`;
+  }
+  return html;
+}
+
+// ================================================================
+// AVAILABILITY MODAL
+// ================================================================
+function openAvail() {
+  loadAvailForm();
+  document.getElementById('availModal').style.display = 'flex';
+}
+function closeAvail() {
+  document.getElementById('availModal').style.display = 'none';
+}
+function availModalClick(e) {
+  if (e.target === document.getElementById('availModal')) closeAvail();
+}
+
+function loadAvailForm() {
+  const stylist = document.getElementById('availStylist').value;
+  const hours   = availability[stylist] || {};
+  document.getElementById('availBody').innerHTML = DAYS_LONG.map((day, dow) => {
+    const dh    = hours[String(dow)];
+    const isOff = dh === null || dh === undefined;
+    const start = dh ? dh.start : '09:00';
+    const end   = dh ? dh.end   : '18:00';
+    return `<tr>
+      <td class="avail-day-name">${day}</td>
+      <td class="avail-off-cell">
+        <input type="checkbox" class="avail-off-cb" id="aoff-${dow}"
+          ${isOff ? 'checked' : ''} onchange="toggleDayOff(${dow})">
+      </td>
+      <td>
+        <input type="time" class="avail-time" id="astart-${dow}"
+          value="${start}" ${isOff ? 'disabled' : ''}>
+      </td>
+      <td>
+        <span class="avail-sep">to</span>
+        <input type="time" class="avail-time" id="aend-${dow}"
+          value="${end}" ${isOff ? 'disabled' : ''}>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleDayOff(dow) {
+  const off = document.getElementById(`aoff-${dow}`).checked;
+  document.getElementById(`astart-${dow}`).disabled = off;
+  document.getElementById(`aend-${dow}`).disabled   = off;
+}
+
+async function saveAvail() {
+  const stylist = document.getElementById('availStylist').value;
+  const hours   = {};
+  for (let dow = 0; dow < 7; dow++) {
+    hours[String(dow)] = document.getElementById(`aoff-${dow}`).checked
+      ? null
+      : { start: document.getElementById(`astart-${dow}`).value,
+          end:   document.getElementById(`aend-${dow}`).value };
+  }
+
+  const btn = document.getElementById('availSaveBtn');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+
+  const { error } = await db.from('availability').upsert({ stylist, hours });
+  btn.textContent = 'Save Hours';
+  btn.disabled = false;
+
+  if (error) { alert('Error saving: ' + error.message); return; }
+
+  availability[stylist] = hours;
+  closeAvail();
+  render();
+}
+
+// ================================================================
 // KEYBOARD
 // ================================================================
 document.addEventListener('keydown', e => {
@@ -1175,14 +1457,22 @@ async function init() {
      </div>
      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
 
-  const { data, error } = await db.from('appointments').select('*');
-  if (error) {
+  const [apptRes, availRes] = await Promise.all([
+    db.from('appointments').select('*'),
+    db.from('availability').select('*'),
+  ]);
+
+  if (apptRes.error) {
     document.getElementById('calWrap').innerHTML =
-      `<div style="padding:40px;color:#c04040;font-size:14px">Failed to load: ${error.message}</div>`;
+      `<div style="padding:40px;color:#c04040;font-size:14px">Failed to load: ${apptRes.error.message}</div>`;
     return;
   }
 
-  appts = data.map(fromRow);
+  appts = apptRes.data.map(fromRow);
+  if (!availRes.error && availRes.data) {
+    availRes.data.forEach(row => { availability[row.stylist] = row.hours; });
+  }
+
   render();
 
   // Real-time sync — any change on any device updates everyone instantly
