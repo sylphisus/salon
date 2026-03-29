@@ -487,6 +487,88 @@
       font-size: 12px;
     }
     .empty-day svg { opacity: 0.35; }
+
+    /* Appointment dots (mobile month view) */
+    .appt-dots { display: none; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
+    .appt-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Week horizontal scroll wrapper */
+    .week-x-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* ── MOBILE ──────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      /* Header: 2-row layout */
+      .header {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 10px 14px 8px;
+        gap: 8px;
+        row-gap: 8px;
+      }
+      .logo { order: 1; font-size: 16px; }
+      .btn-add { order: 2; margin-left: auto; height: 32px; padding: 0 12px; font-size: 12px; }
+      .add-text { display: none; }
+      .nav-group { order: 3; }
+      .period-label { order: 4; flex: 1; font-size: 14px; min-width: unset; text-align: center; }
+      .view-toggle { order: 5; width: 100%; justify-content: stretch; margin-left: 0; }
+      .btn-view { flex: 1; }
+
+      /* Calendar padding */
+      .cal-wrap { padding: 10px 10px; }
+
+      /* Month cells: compact with dots */
+      .mcell { min-height: 60px; padding: 5px 5px 4px; }
+      .chip, .more-btn { display: none; }
+      .appt-dots { display: flex; }
+
+      /* Week view: horizontal scroll, no sticky header inside scroll */
+      .tgrid-header { position: static; min-width: 520px; }
+      .tgrid-body   { min-width: 520px; }
+      .tgrid-scroll { max-height: calc(100vh - 175px); overflow-x: hidden; }
+      .week-x-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .tgrid-corner { width: 46px; }
+      .time-col     { width: 46px; }
+      .time-label   { padding: 0 6px; font-size: 10px; }
+      .tgrid-day-head .dnum { font-size: 16px; }
+      .tgrid-day-head.today .dnum { width: 28px; height: 28px; font-size: 13px; }
+
+      /* Day view header */
+      .day-header h2 { font-size: 15px; }
+      .day-header    { padding: 11px 14px 9px; }
+
+      /* Modal: bottom sheet */
+      .overlay { align-items: flex-end; padding: 0; }
+      .modal {
+        border-radius: 20px 20px 0 0;
+        max-height: 92dvh;
+        overflow-y: auto;
+        animation: sheet-up 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      @keyframes sheet-up {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0); }
+      }
+      .modal-head { padding: 14px 18px; }
+      .modal-head::before {
+        content: '';
+        display: block;
+        width: 36px; height: 4px;
+        background: rgba(255,255,255,0.4);
+        border-radius: 2px;
+        margin: 0 auto 12px;
+      }
+      .modal-body { padding: 16px 16px 8px; }
+      .modal-foot { padding: 12px 16px 24px; }
+
+      /* Form: single column */
+      .frow { grid-template-columns: 1fr; gap: 0; }
+
+      /* Bigger touch targets */
+      .fg input, .fg select, .fg textarea { padding: 11px 12px; font-size: 16px; }
+      .btn-nav  { width: 36px; height: 36px; }
+      .btn-save { padding: 11px 20px; font-size: 14px; }
+      .btn-cancel, .btn-del { padding: 11px 16px; font-size: 14px; }
+    }
   </style>
 </head>
 <body>
@@ -505,7 +587,7 @@
     <button class="btn-view" data-v="week"  onclick="setView('week')">Week</button>
     <button class="btn-view active" data-v="month" onclick="setView('month')">Month</button>
   </div>
-  <button class="btn-add" onclick="openNew()">&#43; New Appointment</button>
+  <button class="btn-add" onclick="openNew()">&#43; <span class="add-text">New Appointment</span></button>
 </header>
 
 <!-- CALENDAR -->
@@ -750,9 +832,15 @@ function monthCell(date, other) {
 
   const more = list.length>MAX ? `<div class="more-btn">+${list.length-MAX} more</div>` : '';
 
+  const dots = list.slice(0,4).map(a => {
+    const c = clr(a.service);
+    return `<div class="appt-dot" style="background:${c.bd}" title="${a.clientName}"></div>`;
+  }).join('');
+
   return `<div class="mcell${today}${cls}" onclick="clickDay('${d}')">
     <div class="mday">${date.getDate()}</div>
     ${chips}${more}
+    <div class="appt-dots">${dots}</div>
   </div>`;
 }
 
@@ -794,13 +882,15 @@ function renderWeek(wrap) {
 
   wrap.innerHTML = `
     <div class="tgrid-outer">
-      <div class="tgrid-header">
-        <div class="tgrid-corner"></div>${dayHeads}
-      </div>
-      <div class="tgrid-scroll">
-        <div class="tgrid-body" style="height:${gh}px">
-          <div class="time-col">${timeLabels}</div>
-          <div class="days-area">${dayCols}</div>
+      <div class="week-x-scroll">
+        <div class="tgrid-header">
+          <div class="tgrid-corner"></div>${dayHeads}
+        </div>
+        <div class="tgrid-scroll">
+          <div class="tgrid-body" style="height:${gh}px">
+            <div class="time-col">${timeLabels}</div>
+            <div class="days-area">${dayCols}</div>
+          </div>
         </div>
       </div>
     </div>`;
@@ -1016,6 +1106,28 @@ document.addEventListener('keydown', e => {
   if (e.key==='ArrowLeft'  && e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') nav(-1);
   if (e.key==='ArrowRight' && e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') nav(1);
 });
+
+// ================================================================
+// SWIPE
+// ================================================================
+(function() {
+  let tx = 0, ty = 0;
+  document.addEventListener('touchstart', e => {
+    tx = e.touches[0].clientX;
+    ty = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    const dy = e.changedTouches[0].clientY - ty;
+    // Only swipe if horizontal movement dominates and overlay is closed
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (document.getElementById('overlay').style.display !== 'none') return;
+    // Don't swipe if touching a horizontally scrollable element
+    const el = e.target.closest('.week-x-scroll, .tgrid-scroll');
+    if (el) return;
+    nav(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
 
 // ================================================================
 // BOOT
