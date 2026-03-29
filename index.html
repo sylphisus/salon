@@ -652,53 +652,88 @@
     }
 
     /* ── AVAILABILITY MODAL ──────────────────────────────── */
-    .avail-table {
-      width: 100%;
-      border-collapse: collapse;
+    .avail-day-card {
+      border: 1.5px solid #f0e8e2;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
     }
-    .avail-table th {
-      font-size: 11px;
-      font-weight: 700;
-      color: #a09090;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      padding: 6px 10px 8px;
-      text-align: left;
-    }
-    .avail-table th:nth-child(2) { text-align: center; }
-    .avail-table td {
-      padding: 5px 10px;
-      border-top: 1px solid #f3ece6;
-      vertical-align: middle;
+    .avail-day-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
     }
     .avail-day-name {
-      font-weight: 600;
-      font-size: 13px;
+      font-weight: 700;
+      font-size: 14px;
       color: #2d2323;
-      min-width: 80px;
     }
-    .avail-off-cell { text-align: center; }
+    .avail-off-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #9e7060;
+      cursor: pointer;
+    }
     .avail-off-cb {
-      width: 16px; height: 16px;
+      width: 15px; height: 15px;
       cursor: pointer;
       accent-color: #7c4d3a;
+    }
+    .avail-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
     }
     .avail-time {
       border: 1.5px solid #e0d4cc;
       border-radius: 6px;
-      padding: 5px 8px;
+      padding: 6px 8px;
       font-size: 13px;
       color: #2d2323;
       font-family: inherit;
-      width: 96px;
+      width: 98px;
       transition: border-color 0.13s;
     }
     .avail-time:focus { outline: none; border-color: #7c4d3a; }
-    .avail-time:disabled { background: #f5f0ec; color: #c0a898; border-color: #ede4dd; }
-    .avail-sep { color: #b09080; font-size: 12px; padding: 0 4px; }
+    .avail-sep { color: #b09080; font-size: 12px; }
+    .avail-rm {
+      background: none;
+      border: 1.5px solid #f0c8c4;
+      border-radius: 6px;
+      color: #c04040;
+      cursor: pointer;
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: all 0.13s;
+    }
+    .avail-rm:hover { background: #fdf0ef; border-color: #c04040; }
+    .avail-add-block {
+      background: none;
+      border: 1.5px dashed #e0d4cc;
+      border-radius: 6px;
+      color: #7c4d3a;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      width: 100%;
+      transition: all 0.13s;
+      font-family: inherit;
+    }
+    .avail-add-block:hover { background: #f5ede7; border-color: #c4835a; }
+    .avail-day-card.is-off .avail-blocks,
+    .avail-day-card.is-off .avail-add-block { display: none; }
+    .avail-day-card.is-off { opacity: 0.55; }
     @media (max-width: 640px) {
-      .avail-table th:last-child, .avail-table td:last-child { display: none; }
-      .avail-time { width: 80px; }
+      .avail-time { width: 82px; font-size: 14px; padding: 8px 6px; }
     }
   </style>
 </head>
@@ -842,17 +877,7 @@
           <option>Harper</option>
         </select>
       </div>
-      <table class="avail-table">
-        <thead>
-          <tr>
-            <th>Day</th>
-            <th>Off</th>
-            <th>Start</th>
-            <th>End</th>
-          </tr>
-        </thead>
-        <tbody id="availBody"></tbody>
-      </table>
+      <div id="availDays"></div>
     </div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeAvail()">Cancel</button>
@@ -1328,33 +1353,43 @@ function setOverlay(val) {
   render();
 }
 
+function normalizeBlocks(val) {
+  if (val === null || val === undefined) return null;
+  if (Array.isArray(val)) return val.length ? val : null;
+  return [val]; // migrate old single {start,end} format
+}
+
 function availOverlay(dayOfWeek) {
   if (overlayStylest === 'none') return '';
   const hours = availability[overlayStylest];
   if (!hours) return '';
-  const dayHours = hours[String(dayOfWeek)];
-  const gh = (HOUR_END - HOUR_START) * HOUR_H;
+  const blocks = normalizeBlocks(hours[String(dayOfWeek)]);
+  const gh     = (HOUR_END - HOUR_START) * HOUR_H;
+  const gridS  = HOUR_START * 60;
+  const gridE  = HOUR_END   * 60;
 
-  // Full day off
-  if (dayHours === null || dayHours === undefined) {
+  if (!blocks) {
     return `<div class="avail-shade day-off" style="top:0;height:${gh}px" title="${overlayStylest} — day off"></div>`;
   }
 
-  const gridS = HOUR_START * 60;
-  const gridE = HOUR_END   * 60;
-  const [sh, sm] = dayHours.start.split(':').map(Number);
-  const [eh, em] = dayHours.end.split(':').map(Number);
-  const startM = sh * 60 + sm;
-  const endM   = eh * 60 + em;
-  let html = '';
+  const sorted = [...blocks].sort((a, b) => a.start.localeCompare(b.start));
+  let html = '', prevEnd = gridS;
 
-  if (startM > gridS) {
-    const h = ((startM - gridS) / 60) * HOUR_H;
-    html += `<div class="avail-shade" style="top:0;height:${h}px"></div>`;
+  for (const block of sorted) {
+    const [sh, sm] = block.start.split(':').map(Number);
+    const [eh, em] = block.end.split(':').map(Number);
+    const startM = sh * 60 + sm;
+    const endM   = eh * 60 + em;
+    if (startM > prevEnd) {
+      const top = ((prevEnd - gridS) / 60) * HOUR_H;
+      const h   = ((startM - prevEnd) / 60) * HOUR_H;
+      html += `<div class="avail-shade" style="top:${top}px;height:${h}px"></div>`;
+    }
+    prevEnd = Math.max(prevEnd, endM);
   }
-  if (endM < gridE) {
-    const top = ((endM - gridS) / 60) * HOUR_H;
-    const h   = ((gridE - endM) / 60) * HOUR_H;
+  if (prevEnd < gridE) {
+    const top = ((prevEnd - gridS) / 60) * HOUR_H;
+    const h   = ((gridE - prevEnd) / 60) * HOUR_H;
     html += `<div class="avail-shade" style="top:${top}px;height:${h}px"></div>`;
   }
   return html;
@@ -1374,37 +1409,77 @@ function availModalClick(e) {
   if (e.target === document.getElementById('availModal')) closeAvail();
 }
 
+function blockHtml(dow, blocks) {
+  return blocks.map((b, i) => `
+    <div class="avail-block" id="ablk-${dow}-${i}">
+      <input type="time" class="avail-time" id="astart-${dow}-${i}" value="${b.start}">
+      <span class="avail-sep">to</span>
+      <input type="time" class="avail-time" id="aend-${dow}-${i}" value="${b.end}">
+      <button class="avail-rm" onclick="removeBlock(${dow},${i})">&#215;</button>
+    </div>`).join('');
+}
+
 function loadAvailForm() {
   const stylist = document.getElementById('availStylist').value;
   const hours   = availability[stylist] || {};
-  document.getElementById('availBody').innerHTML = DAYS_LONG.map((day, dow) => {
-    const dh    = hours[String(dow)];
-    const isOff = dh === null || dh === undefined;
-    const start = dh ? dh.start : '09:00';
-    const end   = dh ? dh.end   : '18:00';
-    return `<tr>
-      <td class="avail-day-name">${day}</td>
-      <td class="avail-off-cell">
-        <input type="checkbox" class="avail-off-cb" id="aoff-${dow}"
-          ${isOff ? 'checked' : ''} onchange="toggleDayOff(${dow})">
-      </td>
-      <td>
-        <input type="time" class="avail-time" id="astart-${dow}"
-          value="${start}" ${isOff ? 'disabled' : ''}>
-      </td>
-      <td>
-        <span class="avail-sep">to</span>
-        <input type="time" class="avail-time" id="aend-${dow}"
-          value="${end}" ${isOff ? 'disabled' : ''}>
-      </td>
-    </tr>`;
+  document.getElementById('availDays').innerHTML = DAYS_LONG.map((day, dow) => {
+    const blocks = normalizeBlocks(hours[String(dow)]);
+    const isOff  = !blocks;
+    const initial = blocks || [{ start: '09:00', end: '18:00' }];
+    return `<div class="avail-day-card${isOff ? ' is-off' : ''}" id="acard-${dow}">
+      <div class="avail-day-head">
+        <span class="avail-day-name">${day}</span>
+        <label class="avail-off-label">
+          <input type="checkbox" class="avail-off-cb" id="aoff-${dow}"
+            ${isOff ? 'checked' : ''} onchange="toggleDayOff(${dow})"> Off
+        </label>
+      </div>
+      <div class="avail-blocks" id="ablocks-${dow}">${blockHtml(dow, initial)}</div>
+      <button class="avail-add-block" onclick="addBlock(${dow})">+ Add time block</button>
+    </div>`;
   }).join('');
 }
 
 function toggleDayOff(dow) {
-  const off = document.getElementById(`aoff-${dow}`).checked;
-  document.getElementById(`astart-${dow}`).disabled = off;
-  document.getElementById(`aend-${dow}`).disabled   = off;
+  const isOff = document.getElementById(`aoff-${dow}`).checked;
+  document.getElementById(`acard-${dow}`).classList.toggle('is-off', isOff);
+}
+
+function collectBlocks(dow) {
+  const blocks = [];
+  document.getElementById(`ablocks-${dow}`).querySelectorAll('.avail-block').forEach((_, i) => {
+    const s = document.getElementById(`astart-${dow}-${i}`)?.value;
+    const e = document.getElementById(`aend-${dow}-${i}`)?.value;
+    if (s && e) blocks.push({ start: s, end: e });
+  });
+  return blocks;
+}
+
+function rebuildBlocks(dow, blocks) {
+  document.getElementById(`ablocks-${dow}`).innerHTML = blockHtml(dow, blocks);
+}
+
+function addBlock(dow) {
+  const blocks = collectBlocks(dow);
+  const last   = blocks[blocks.length - 1];
+  let newStart = '09:00', newEnd = '18:00';
+  if (last) {
+    const [h, m] = last.end.split(':').map(Number);
+    const sM = h * 60 + m + 60;
+    const eM = Math.min(sM + 120, HOUR_END * 60);
+    if (sM < HOUR_END * 60) {
+      newStart = `${String(Math.floor(sM/60)).padStart(2,'0')}:${String(sM%60).padStart(2,'0')}`;
+      newEnd   = `${String(Math.floor(eM/60)).padStart(2,'0')}:${String(eM%60).padStart(2,'0')}`;
+    }
+  }
+  blocks.push({ start: newStart, end: newEnd });
+  rebuildBlocks(dow, blocks);
+}
+
+function removeBlock(dow, idx) {
+  const blocks = collectBlocks(dow);
+  blocks.splice(idx, 1);
+  rebuildBlocks(dow, blocks);
 }
 
 async function saveAvail() {
@@ -1412,9 +1487,7 @@ async function saveAvail() {
   const hours   = {};
   for (let dow = 0; dow < 7; dow++) {
     hours[String(dow)] = document.getElementById(`aoff-${dow}`).checked
-      ? null
-      : { start: document.getElementById(`astart-${dow}`).value,
-          end:   document.getElementById(`aend-${dow}`).value };
+      ? null : collectBlocks(dow);
   }
 
   const btn = document.getElementById('availSaveBtn');
