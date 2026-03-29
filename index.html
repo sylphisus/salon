@@ -609,6 +609,7 @@
         <div class="fg">
           <label>Service *</label>
           <select id="fService">
+            <option>Head Spa</option>
             <option>Haircut</option>
             <option>Color</option>
             <option>Highlights</option>
@@ -625,7 +626,7 @@
           <label>Stylist</label>
           <select id="fStylist">
             <option value="Any">Any Available</option>
-            <option>Emma</option>
+            <option>Uyen</option>
             <option>Sophia</option>
             <option>Olivia</option>
             <option>Mia</option>
@@ -674,6 +675,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ================================================================
 // CONFIG
@@ -702,14 +704,36 @@ const SVC_COLORS = {
 function clr(svc) { return SVC_COLORS[svc] || { bg:'#f5ede7', tx:'#7c4d3a', bd:'#c4835a' }; }
 
 // ================================================================
+// SUPABASE
+// ================================================================
+const { createClient } = window.supabase;
+const db = createClient(
+  'https://japgfltuvdteiuydgumy.supabase.co',
+  'sb_publishable_DE1bPwo_Sob4u1rYwoFsqw_qVN-g0FG'
+);
+
+function toRow(a) {
+  return {
+    id: a.id, client_name: a.clientName, service: a.service,
+    stylist: a.stylist, date: a.date, time: a.time,
+    duration: a.duration, phone: a.phone || null, notes: a.notes || null
+  };
+}
+function fromRow(r) {
+  return {
+    id: r.id, clientName: r.client_name, service: r.service,
+    stylist: r.stylist, date: r.date, time: r.time,
+    duration: r.duration, phone: r.phone || '', notes: r.notes || ''
+  };
+}
+
+// ================================================================
 // STATE
 // ================================================================
-let cur  = new Date();
-let view = 'month';
-let appts = JSON.parse(localStorage.getItem('salonbook-v1') || '[]');
+let cur    = new Date();
+let view   = 'month';
+let appts  = [];
 let editId = null;
-
-function save() { localStorage.setItem('salonbook-v1', JSON.stringify(appts)); }
 
 // ================================================================
 // UTILS
@@ -1059,7 +1083,7 @@ function closeModal() {
 }
 function overlayClick(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
 
-function saveAppt() {
+async function saveAppt() {
   const client = document.getElementById('fClient').value.trim();
   const date   = document.getElementById('fDate').value;
   const time   = document.getElementById('fTime').value;
@@ -1072,28 +1096,36 @@ function saveAppt() {
     clientName: client,
     service:    document.getElementById('fService').value,
     stylist:    document.getElementById('fStylist').value,
-    date,
-    time,
+    date, time,
     duration:   parseInt(document.getElementById('fDuration').value),
     phone:      document.getElementById('fPhone').value.trim(),
     notes:      document.getElementById('fNotes').value.trim(),
   };
 
-  if (editId) {
-    appts = appts.map(x => x.id===editId ? a : x);
-  } else {
-    appts.push(a);
-  }
+  const btn = document.querySelector('.btn-save');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
 
-  save();
+  const { error } = await db.from('appointments').upsert(toRow(a));
+  btn.textContent = 'Save Appointment';
+  btn.disabled = false;
+
+  if (error) { alert('Error saving: ' + error.message); return; }
+
+  if (editId) appts = appts.map(x => x.id===editId ? a : x);
+  else        appts.push(a);
+
   closeModal();
   render();
 }
 
-function deleteAppt() {
+async function deleteAppt() {
   if (!editId || !confirm('Delete this appointment?')) return;
-  appts = appts.filter(x=>x.id!==editId);
-  save();
+
+  const { error } = await db.from('appointments').delete().eq('id', editId);
+  if (error) { alert('Error deleting: ' + error.message); return; }
+
+  appts = appts.filter(x => x.id !== editId);
   closeModal();
   render();
 }
@@ -1132,7 +1164,37 @@ document.addEventListener('keydown', e => {
 // ================================================================
 // BOOT
 // ================================================================
-render();
+async function init() {
+  // Show loading state
+  document.getElementById('calWrap').innerHTML =
+    `<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#b09080;font-size:14px;gap:10px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+      </svg>
+      Loading appointments…
+     </div>
+     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+
+  const { data, error } = await db.from('appointments').select('*');
+  if (error) {
+    document.getElementById('calWrap').innerHTML =
+      `<div style="padding:40px;color:#c04040;font-size:14px">Failed to load: ${error.message}</div>`;
+    return;
+  }
+
+  appts = data.map(fromRow);
+  render();
+
+  // Real-time sync — any change on any device updates everyone instantly
+  db.channel('appointments')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, async () => {
+      const { data } = await db.from('appointments').select('*');
+      if (data) { appts = data.map(fromRow); render(); }
+    })
+    .subscribe();
+}
+
+init();
 </script>
 </body>
 </html>
