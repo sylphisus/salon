@@ -121,6 +121,22 @@
     }
     .btn-add:hover { background: #6b3f2f; }
 
+    .btn-import {
+      height: 34px;
+      padding: 0 14px;
+      background: none;
+      color: #7c4d3a;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      flex-shrink: 0;
+      transition: all 0.13s;
+    }
+    .btn-import:hover { background: #f5ede7; border-color: #c4835a; }
+
     /* ── CALENDAR WRAPPER ────────────────────────────────── */
     .cal-wrap {
       padding: 20px 24px;
@@ -507,6 +523,7 @@
       }
       .logo { order: 1; font-size: 16px; }
       .btn-add { order: 2; margin-left: auto; height: 32px; padding: 0 12px; font-size: 12px; }
+      .btn-import { order: 2; height: 32px; padding: 0 10px; margin-left: 6px; }
       .add-text { display: none; }
       .nav-group { order: 3; }
       .period-label { order: 4; flex: 1; font-size: 14px; min-width: unset; text-align: center; }
@@ -770,6 +787,11 @@
     </button>
   </div>
   <button class="btn-add" onclick="openNew()">&#43; <span class="add-text">New Appointment</span></button>
+  <button class="btn-import" onclick="document.getElementById('icsInput').click()" title="Import .ics from Apple Calendar">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <span class="add-text">Import</span>
+  </button>
+  <input type="file" id="icsInput" accept=".ics" style="display:none" onchange="importIcs(this)" />
 </header>
 
 <!-- CALENDAR -->
@@ -1535,6 +1557,94 @@ document.addEventListener('keydown', e => {
     nav(dx < 0 ? 1 : -1);
   }, { passive: true });
 })();
+
+// ================================================================
+// ICS IMPORT
+// ================================================================
+function parseIcs(text) {
+  const unfolded = text.replace(/\r?\n[ \t]/g, '');
+  const lines    = unfolded.split(/\r?\n/);
+  const events   = [];
+  let cur        = null;
+
+  for (const raw of lines) {
+    const colon = raw.indexOf(':');
+    if (colon === -1) continue;
+    const key = raw.slice(0, colon).toUpperCase();
+    const val = raw.slice(colon + 1);
+
+    if (key === 'BEGIN' && val === 'VEVENT') { cur = {}; continue; }
+    if (key === 'END'   && val === 'VEVENT') { if (cur) events.push(cur); cur = null; continue; }
+    if (!cur) continue;
+
+    const baseKey = key.split(';')[0];
+    if (baseKey === 'SUMMARY')     cur.summary     = val;
+    if (baseKey === 'DESCRIPTION') cur.description = val.replace(/\\n/g, '\n').replace(/\\,/g, ',');
+    if (baseKey === 'DTSTART')     cur.dtstart     = val;
+    if (baseKey === 'DTEND')       cur.dtend       = val;
+  }
+  return events;
+}
+
+function parseIcsDate(dtStr) {
+  const s      = dtStr.replace('Z', '');
+  const allDay = s.length === 8;
+  const yr = parseInt(s.slice(0,4)), mo = parseInt(s.slice(4,6))-1, dy = parseInt(s.slice(6,8));
+  if (allDay) return { date: new Date(yr, mo, dy), allDay: true };
+  const hr = parseInt(s.slice(9,11)), mn = parseInt(s.slice(11,13));
+  const date = dtStr.endsWith('Z')
+    ? new Date(Date.UTC(yr, mo, dy, hr, mn))
+    : new Date(yr, mo, dy, hr, mn);
+  return { date, allDay: false };
+}
+
+async function importIcs(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  const events = parseIcs(await file.text());
+  if (!events.length) { alert('No events found in this .ics file.'); return; }
+
+  const toImport = [];
+  for (const ev of events) {
+    if (!ev.dtstart) continue;
+    const start = parseIcsDate(ev.dtstart);
+    let timeStr = '10:00', duration = 60;
+
+    if (!start.allDay) {
+      const h = start.date.getHours(), m = start.date.getMinutes();
+      timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+    if (ev.dtend) {
+      const end   = parseIcsDate(ev.dtend);
+      const diffM = Math.round((end.date - start.date) / 60000);
+      if (diffM > 0) duration = diffM;
+    }
+
+    toImport.push({
+      id:         `ics${Date.now()}${Math.random().toString(36).slice(2,6)}`,
+      clientName: ev.summary || 'Imported Event',
+      service:    'Haircut',
+      stylist:    'Any',
+      date:       ymd(start.date),
+      time:       timeStr,
+      duration,
+      phone:      '',
+      notes:      ev.description || '',
+    });
+  }
+
+  if (!toImport.length) { alert('No valid events found to import.'); return; }
+  if (!confirm(`Import ${toImport.length} event${toImport.length!==1?'s':''} from "${file.name}"?`)) return;
+
+  const { error } = await db.from('appointments').upsert(toImport.map(toRow));
+  if (error) { alert('Import failed: ' + error.message); return; }
+
+  appts.push(...toImport);
+  render();
+  alert(`Imported ${toImport.length} appointment${toImport.length!==1?'s':''}.`);
+}
 
 // ================================================================
 // BOOT
