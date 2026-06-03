@@ -1321,10 +1321,8 @@ function openNew() {
 }
 
 function clickDay(dateStr) {
-  editId = null;
-  fillModal(dateStr, '10:00');
-  document.getElementById('overlay').style.display = 'flex';
-  setTimeout(() => document.getElementById('fClient').focus(), 60);
+  cur = parseYmd(dateStr);
+  setView('day');
 }
 
 function clickSlot(dateStr, timeStr) {
