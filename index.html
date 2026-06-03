@@ -1129,7 +1129,8 @@ function monthCell(date, other) {
 
   const dots = list.slice(0,4).map(a => {
     const c = clr(a.service);
-    return `<div class="appt-dot" style="background:${c.bd}" title="${a.clientName}"></div>`;
+    const bg = isNew(a) ? '#ff6a3d' : c.bd; // new events get an orange dot on mobile
+    return `<div class="appt-dot" style="background:${bg}" title="${a.clientName}"></div>`;
   }).join('');
 
   return `<div class="mcell${today}${cls}" onclick="clickDay('${d}')">
