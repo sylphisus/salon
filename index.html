@@ -216,6 +216,26 @@
     }
     .chip:hover { filter: brightness(0.93); }
 
+    /* "New since your last visit" highlight (inset ring survives overflow:hidden) */
+    .is-new { animation: newPulse 1.8s ease-in-out infinite; }
+    @keyframes newPulse {
+      0%, 100% { box-shadow: inset 0 0 0 2px #ff6a3d; }
+      50%      { box-shadow: inset 0 0 0 2px rgba(255,106,61,0.4); }
+    }
+    .new-tag {
+      display: inline-block;
+      background: #ff6a3d;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 2px 3px;
+      border-radius: 3px;
+      margin-right: 3px;
+      vertical-align: middle;
+      letter-spacing: 0.3px;
+    }
+
     .more-btn {
       font-size: 11px;
       font-weight: 700;
@@ -953,14 +973,16 @@ function toRow(a) {
   return {
     id: a.id, client_name: a.clientName, service: a.service,
     stylist: a.stylist, date: a.date, time: a.time,
-    duration: a.duration, phone: a.phone || null, notes: a.notes || null
+    duration: a.duration, phone: a.phone || null, notes: a.notes || null,
+    updated_at: new Date().toISOString()
   };
 }
 function fromRow(r) {
   return {
     id: r.id, clientName: r.client_name, service: r.service,
     stylist: r.stylist, date: r.date, time: r.time,
-    duration: r.duration, phone: r.phone || '', notes: r.notes || ''
+    duration: r.duration, phone: r.phone || '', notes: r.notes || '',
+    createdAt: r.created_at, updatedAt: r.updated_at
   };
 }
 
@@ -973,6 +995,8 @@ let appts          = [];
 let editId         = null;
 let overlayStylest = 'none';
 let availability   = {}; // { stylist: { "0": null, "1": {start,end}, ... } }
+let newBaseline    = null;          // epoch ms of this device's previous visit
+const selfIds      = new Set();     // appts created on THIS device this session
 
 // ================================================================
 // UTILS
@@ -1005,6 +1029,13 @@ function timeTop(timeStr) {
   return ((h*60+m) - HOUR_START*60) / 60 * HOUR_H;
 }
 function durationH(mins) { return mins / 60 * HOUR_H; }
+// "New" = added or edited by someone else since this device's previous visit
+function isNew(a) {
+  const ts = a.updatedAt || a.createdAt; // updated_at bumps on every save; created_at is the fallback
+  return ts && newBaseline !== null
+    && new Date(ts).getTime() > newBaseline
+    && !selfIds.has(a.id);
+}
 
 // ================================================================
 // NAV
@@ -1088,9 +1119,10 @@ function monthCell(date, other) {
 
   const chips = list.slice(0,MAX).map(a => {
     const c = clr(a.service);
-    return `<div class="chip" style="background:${c.bg};color:${c.tx};border-left:3px solid ${c.bd}"
+    const nw = isNew(a);
+    return `<div class="chip${nw?' is-new':''}" style="background:${c.bg};color:${c.tx};border-left:3px solid ${c.bd}"
       onclick="event.stopPropagation();openEdit('${a.id}')"
-      title="${a.clientName} · ${a.service}">${fmt12(a.time)} ${a.clientName}</div>`;
+      title="${a.clientName} · ${a.service}">${nw?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)} ${a.clientName}</div>`;
   }).join('');
 
   const more = list.length>MAX ? `<div class="more-btn">+${list.length-MAX} more</div>` : '';
@@ -1165,9 +1197,10 @@ function weekAppt(a) {
   const top  = timeTop(a.time);
   const h    = Math.max(durationH(a.duration)-2, 18);
   const c    = clr(a.service);
-  return `<div class="tgrid-appt" style="top:${top}px;height:${h}px;background:${c.bg};color:${c.tx};border-left:3px solid ${c.bd}"
+  const nw   = isNew(a);
+  return `<div class="tgrid-appt${nw?' is-new':''}" style="top:${top}px;height:${h}px;background:${c.bg};color:${c.tx};border-left:3px solid ${c.bd}"
     onclick="event.stopPropagation();openEdit('${a.id}')">
-    <div class="ta-time">${fmt12(a.time)}</div>
+    <div class="ta-time">${nw?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)}</div>
     <div class="ta-name">${a.clientName}</div>
   </div>`;
 }
@@ -1197,9 +1230,10 @@ function renderDay(wrap) {
     const top  = timeTop(a.time);
     const h    = Math.max(durationH(a.duration)-2, 28);
     const c    = clr(a.service);
-    return `<div class="tgrid-appt" style="top:${top}px;height:${h}px;background:${c.bg};color:${c.tx};border-left:4px solid ${c.bd};left:4px;right:4px"
+    const nw   = isNew(a);
+    return `<div class="tgrid-appt${nw?' is-new':''}" style="top:${top}px;height:${h}px;background:${c.bg};color:${c.tx};border-left:4px solid ${c.bd};left:4px;right:4px"
       onclick="event.stopPropagation();openEdit('${a.id}')">
-      <div class="ta-time">${fmt12(a.time)} · ${a.duration} min</div>
+      <div class="ta-time">${nw?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)} · ${a.duration} min</div>
       <div class="ta-name">${a.clientName}</div>
       <div class="ta-svc">${a.service}${a.stylist!=='Any' ? ' · '+a.stylist : ''}</div>
     </div>`;
@@ -1353,6 +1387,7 @@ async function saveAppt() {
 
   if (editId) appts = appts.map(x => x.id===editId ? a : x);
   else        appts.push(a);
+  selfIds.add(a.id); // don't flag your own add/edit as NEW on your own device
 
   closeModal();
   render();
@@ -1644,6 +1679,7 @@ async function importIcs(input) {
   if (error) { alert('Import failed: ' + error.message); return; }
 
   appts.push(...toImport);
+  toImport.forEach(a => selfIds.add(a.id)); // your own import isn't "new from others"
   render();
   alert(`Imported ${toImport.length} appointment${toImport.length!==1?'s':''}.`);
 }
@@ -1677,6 +1713,12 @@ async function init() {
   if (!availRes.error && availRes.data) {
     availRes.data.forEach(row => { availability[row.stylist] = row.hours; });
   }
+
+  // Per-device memory of last visit. localStorage is inherently per-device,
+  // so it doubles as the "device id" — anything created since last visit is NEW.
+  const stored = localStorage.getItem('salonLastSeen');
+  newBaseline = stored ? Number(stored) : Date.now(); // first-ever visit flags nothing
+  localStorage.setItem('salonLastSeen', String(Date.now()));
 
   render();
 
