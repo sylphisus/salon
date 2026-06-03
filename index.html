@@ -236,6 +236,38 @@
       letter-spacing: 0.3px;
     }
 
+    /* Deleted-since-last-visit tombstone: details stay legible, struck through */
+    .is-deleted { cursor: default; animation: none; }
+    .chip.is-deleted {
+      background: #efe9e6;
+      border-left: 3px solid #b9a99f;
+      color: #8a7d76;
+    }
+    .tgrid-appt.is-deleted {
+      background: #efe9e6;
+      border-left: 3px solid #b9a99f;
+      color: #8a7d76;
+      z-index: 9;
+    }
+    .is-deleted .del-text,
+    .is-deleted .ta-time,
+    .is-deleted .ta-name,
+    .is-deleted .ta-svc { text-decoration: line-through; }
+    .del-tag {
+      display: inline-block;
+      background: #8a7d76;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 2px 3px;
+      border-radius: 3px;
+      margin-right: 3px;
+      vertical-align: middle;
+      letter-spacing: 0.3px;
+      text-decoration: none;
+    }
+
     .more-btn {
       font-size: 11px;
       font-weight: 700;
@@ -982,7 +1014,7 @@ function fromRow(r) {
     id: r.id, clientName: r.client_name, service: r.service,
     stylist: r.stylist, date: r.date, time: r.time,
     duration: r.duration, phone: r.phone || '', notes: r.notes || '',
-    createdAt: r.created_at, updatedAt: r.updated_at
+    createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at
   };
 }
 
@@ -1022,7 +1054,14 @@ function weekStart(d) {
   return w;
 }
 function byDate(dateStr) {
-  return appts.filter(a=>a.date===dateStr).sort((a,b)=>a.time.localeCompare(b.time));
+  return appts.filter(a=>a.date===dateStr && !a.deletedAt).sort((a,b)=>a.time.localeCompare(b.time));
+}
+// Appointments deleted by someone else since this device's previous visit (transient tombstones)
+function deletedSince(dateStr) {
+  return appts.filter(a => a.date===dateStr && a.deletedAt
+      && newBaseline !== null && new Date(a.deletedAt).getTime() > newBaseline
+      && !selfIds.has(a.id))
+    .sort((a,b)=>a.time.localeCompare(b.time));
 }
 function timeTop(timeStr) {
   const [h,m] = timeStr.split(':').map(Number);
@@ -1127,16 +1166,25 @@ function monthCell(date, other) {
 
   const more = list.length>MAX ? `<div class="more-btn">+${list.length-MAX} more</div>` : '';
 
+  const del = deletedSince(d);
+  const ghosts = del.map(a =>
+    `<div class="chip is-deleted" title="Deleted: ${a.clientName} · ${a.service} · ${fmt12(a.time)}"
+      ><span class="del-tag">DELETED</span><span class="del-text">${fmt12(a.time)} ${a.clientName}</span></div>`
+  ).join('');
+
   const dots = list.slice(0,4).map(a => {
     const c = clr(a.service);
     const bg = isNew(a) ? '#ff6a3d' : c.bd; // new events get an orange dot on mobile
     return `<div class="appt-dot" style="background:${bg}" title="${a.clientName}"></div>`;
   }).join('');
+  const delDots = del.slice(0,4).map(a =>
+    `<div class="appt-dot" style="background:#b9a99f" title="Deleted: ${a.clientName}"></div>`
+  ).join('');
 
   return `<div class="mcell${today}${cls}" onclick="clickDay('${d}')">
     <div class="mday">${date.getDate()}</div>
-    ${chips}${more}
-    <div class="appt-dots">${dots}</div>
+    ${chips}${ghosts}${more}
+    <div class="appt-dots">${dots}${delDots}</div>
   </div>`;
 }
 
@@ -1171,9 +1219,10 @@ function renderWeek(wrap) {
     }).join('');
 
     const apts = byDate(ymd(d)).map(a => weekAppt(a)).join('');
+    const ghosts = deletedSince(ymd(d)).map(a => weekGhost(a)).join('');
     const nl   = isToday(d) ? nowLine() : '';
 
-    return `<div class="day-col" style="height:${gh}px">${rows}${apts}${nl}${availOverlay(d.getDay())}</div>`;
+    return `<div class="day-col" style="height:${gh}px">${rows}${apts}${ghosts}${nl}${availOverlay(d.getDay())}</div>`;
   }).join('');
 
   wrap.innerHTML = `
@@ -1202,6 +1251,15 @@ function weekAppt(a) {
   return `<div class="tgrid-appt${nw?' is-new':''}" style="top:${top}px;height:${h}px;background:${c.bg};color:${c.tx};border-left:3px solid ${c.bd}"
     onclick="event.stopPropagation();openEdit('${a.id}')">
     <div class="ta-time">${nw?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)}</div>
+    <div class="ta-name">${a.clientName}</div>
+  </div>`;
+}
+
+function weekGhost(a) {
+  const top = timeTop(a.time);
+  const h   = Math.max(durationH(a.duration)-2, 18);
+  return `<div class="tgrid-appt is-deleted" style="top:${top}px;height:${h}px">
+    <div class="ta-time"><span class="del-tag">DELETED</span>${fmt12(a.time)}</div>
     <div class="ta-name">${a.clientName}</div>
   </div>`;
 }
@@ -1240,6 +1298,16 @@ function renderDay(wrap) {
     </div>`;
   }).join('');
 
+  const ghosts = deletedSince(d).map(a => {
+    const top  = timeTop(a.time);
+    const h    = Math.max(durationH(a.duration)-2, 28);
+    return `<div class="tgrid-appt is-deleted" style="top:${top}px;height:${h}px;left:4px;right:4px">
+      <div class="ta-time"><span class="del-tag">DELETED</span>${fmt12(a.time)} · ${a.duration} min</div>
+      <div class="ta-name">${a.clientName}</div>
+      <div class="ta-svc">${a.service}${a.stylist!=='Any' ? ' · '+a.stylist : ''}</div>
+    </div>`;
+  }).join('');
+
   const nl = isToday(cur) ? nowLine() : '';
 
   const emptyState = list.length===0 ? `
@@ -1261,7 +1329,7 @@ function renderDay(wrap) {
           <div class="time-col">${timeLabels}</div>
           <div class="days-area">
             <div class="day-col" style="height:${gh}px;position:relative">
-              ${rows}${apts}${nl}${emptyState}${availOverlay(cur.getDay())}
+              ${rows}${apts}${ghosts}${nl}${emptyState}${availOverlay(cur.getDay())}
             </div>
           </div>
         </div>
@@ -1395,10 +1463,13 @@ async function saveAppt() {
 async function deleteAppt() {
   if (!editId || !confirm('Delete this appointment?')) return;
 
-  const { error } = await db.from('appointments').delete().eq('id', editId);
+  // Soft delete: stamp deleted_at so other devices can show it as a change.
+  const ts = new Date().toISOString();
+  const { error } = await db.from('appointments').update({ deleted_at: ts }).eq('id', editId);
   if (error) { alert('Error deleting: ' + error.message); return; }
 
-  appts = appts.filter(x => x.id !== editId);
+  selfIds.add(editId); // don't show our own deletion as a change on this device
+  appts = appts.map(x => x.id===editId ? { ...x, deletedAt: ts } : x);
   closeModal();
   render();
 }
@@ -1718,6 +1789,11 @@ async function init() {
   const stored = localStorage.getItem('salonLastSeen');
   newBaseline = stored ? Number(stored) : Date.now(); // first-ever visit flags nothing
   localStorage.setItem('salonLastSeen', String(Date.now()));
+
+  // Purge tombstones older than 30 days so soft-deleted rows don't pile up forever.
+  db.from('appointments').delete()
+    .not('deleted_at', 'is', null)
+    .lt('deleted_at', new Date(Date.now() - 30*86400000).toISOString());
 
   render();
 
