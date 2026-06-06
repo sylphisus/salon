@@ -212,20 +212,88 @@
 // syncs across devices in real time (same pattern as appointments).
 // ================================================================
 // ZXing's BrowserMultiFormatReader.decodeFromImageUrl is unreliable in this
-// build, so we decode via the core API: image → canvas → luminance → bitmap.
+// build, so we drive the core API directly. A naive single pass fails on most
+// real photos, so decodeImage() tries multiple orientations, both binarizers,
+// and a grid of overlapping zoomed-in tiles — a barcode that's small within a
+// large photo is the most common failure. It yields to the event loop between
+// passes so the page stays responsive while "Decoding…" shows.
 const hints = new Map();
 hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 const mfReader = new ZXing.MultiFormatReader();
 mfReader.setHints(hints);
 
-function decodeImage(img) {
-  const canvas = document.createElement('canvas');
-  canvas.width  = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  canvas.getContext('2d').drawImage(img, 0, 0);
-  const lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-  const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
-  return mfReader.decode(bmp); // throws if no barcode found
+const BINARIZERS = [ZXing.HybridBinarizer, ZXing.GlobalHistogramBinarizer];
+const MAX_EDGE   = 2000;                       // cap working resolution for speed
+const yieldToUI  = () => new Promise(r => setTimeout(r));
+
+function toCanvas(img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  return c;
+}
+function capCanvas(src, maxEdge) {
+  const s = Math.min(1, maxEdge / Math.max(src.width, src.height));
+  if (s >= 1) return src;
+  const c = document.createElement('canvas');
+  c.width = Math.round(src.width * s); c.height = Math.round(src.height * s);
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  return c;
+}
+function rotateCanvas(src, deg) {
+  const swap = deg === 90 || deg === 270;
+  const c = document.createElement('canvas');
+  c.width  = swap ? src.height : src.width;
+  c.height = swap ? src.width  : src.height;
+  const x = c.getContext('2d');
+  x.translate(c.width / 2, c.height / 2);
+  x.rotate(deg * Math.PI / 180);
+  x.drawImage(src, -src.width / 2, -src.height / 2);
+  return c;
+}
+function cropCanvas(src, sx, sy, sw, sh) {
+  const c = document.createElement('canvas');
+  c.width = sw; c.height = sh;
+  c.getContext('2d').drawImage(src, sx, sy, sw, sh, 0, 0, sw, sh);
+  return c;
+}
+function tryDecode(canvas, binarizers) {
+  for (const deg of [0, 90, 180, 270]) {
+    const c = deg === 0 ? canvas : rotateCanvas(canvas, deg);
+    for (const B of binarizers) {
+      const lum = new ZXing.HTMLCanvasElementLuminanceSource(c);
+      const bmp = new ZXing.BinaryBitmap(new B(lum));
+      try { const r = mfReader.decode(bmp); mfReader.reset(); return r; }
+      catch (e) { mfReader.reset(); }
+    }
+  }
+  return null;
+}
+
+// Returns a ZXing Result, or throws if nothing decodes anywhere.
+async function decodeImage(img) {
+  const base = capCanvas(toCanvas(img), MAX_EDGE);
+
+  // 1) whole image — all orientations, both binarizers
+  let r = tryDecode(base, BINARIZERS);
+  if (r) return r;
+
+  // 2) overlapping tiles (2×2 then 3×3) zoom into small / off-center codes
+  const W = base.width, H = base.height;
+  for (const n of [2, 3]) {
+    const tw = Math.ceil(W / n), th = Math.ceil(H / n);
+    const stepX = Math.floor(tw / 2), stepY = Math.floor(th / 2);   // half-tile overlap
+    for (let y = 0; y + 1 < H; y += stepY) {
+      await yieldToUI();
+      for (let x = 0; x + 1 < W; x += stepX) {
+        const cw = Math.min(tw, W - x), ch = Math.min(th, H - y);
+        if (cw < 40 || ch < 40) continue;
+        r = tryDecode(cropCanvas(base, x, y, cw, ch), [ZXing.HybridBinarizer]);
+        if (r) return r;
+      }
+    }
+  }
+  throw new Error('No barcode found');
 }
 
 // Supabase — same project/key as the calendar app
@@ -294,7 +362,7 @@ async function handleFiles(fileList) {
       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = objUrl; });
       item.thumb = makeThumb(img);          // small data URL (replaces the object URL)
       URL.revokeObjectURL(objUrl);
-      item.code   = decodeImage(img).getText();
+      item.code   = (await decodeImage(img)).getText();
       item.status = 'ok';
       render();
       await saveBarcode(item);              // persist successful decodes only
