@@ -217,13 +217,29 @@
 // and a grid of overlapping zoomed-in tiles — a barcode that's small within a
 // large photo is the most common failure. It yields to the event loop between
 // passes so the page stays responsive while "Decoding…" shows.
-const hints = new Map();
-hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+// Only scan robust, checksummed formats. Linear codes without a required
+// checksum (ITF, Codabar) hallucinate wrong codes from degraded photos, and a
+// wrong code is worse than none. Add formats here if you scan others.
+const FORMATS = [
+  ZXing.BarcodeFormat.UPC_A,  ZXing.BarcodeFormat.UPC_E,
+  ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+  ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+  ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
+];
+// IMPORTANT: in this build, mfReader.decode(bmp) ignores hints set via
+// setHints() — hints must be passed straight to decode(), or TRY_HARDER (which
+// is what actually rescues most real photos) silently never runs.
+const HINTS = new Map();
+HINTS.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, FORMATS);
+HINTS.set(ZXing.DecodeHintType.TRY_HARDER, true);
+const FAST_HINTS = new Map();                  // TRY_HARDER omitted (cheap pass)
+FAST_HINTS.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, FORMATS);
 const mfReader = new ZXing.MultiFormatReader();
-mfReader.setHints(hints);
 
 const BINARIZERS = [ZXing.HybridBinarizer, ZXing.GlobalHistogramBinarizer];
-const MAX_EDGE   = 2000;                       // cap working resolution for speed
+const MAX_EDGE   = 2000;                        // cap working resolution for speed
+const TIME_BUDGET_MS = 8000;                    // give up tiling after this
 const yieldToUI  = () => new Promise(r => setTimeout(r));
 
 function toCanvas(img) {
@@ -257,14 +273,14 @@ function cropCanvas(src, sx, sy, sw, sh) {
   c.getContext('2d').drawImage(src, sx, sy, sw, sh, 0, 0, sw, sh);
   return c;
 }
-function tryDecode(canvas, binarizers) {
+function tryDecode(canvas, binarizers, hints) {
   for (const deg of [0, 90, 180, 270]) {
     const c = deg === 0 ? canvas : rotateCanvas(canvas, deg);
     for (const B of binarizers) {
       const lum = new ZXing.HTMLCanvasElementLuminanceSource(c);
       const bmp = new ZXing.BinaryBitmap(new B(lum));
-      try { const r = mfReader.decode(bmp); mfReader.reset(); return r; }
-      catch (e) { mfReader.reset(); }
+      try { return mfReader.decode(bmp, hints); }   // hints MUST be passed here
+      catch (e) { /* not found in this orientation/binarizer */ }
     }
   }
   return null;
@@ -273,22 +289,27 @@ function tryDecode(canvas, binarizers) {
 // Returns a ZXing Result, or throws if nothing decodes anywhere.
 async function decodeImage(img) {
   const base = capCanvas(toCanvas(img), MAX_EDGE);
+  const deadline = performance.now() + TIME_BUDGET_MS;
 
-  // 1) whole image — all orientations, both binarizers
-  let r = tryDecode(base, BINARIZERS);
+  // 1) whole image — all orientations, both binarizers, TRY_HARDER.
+  //    This alone reads most real photos (rotated, glare, off-axis).
+  let r = tryDecode(base, BINARIZERS, HINTS);
   if (r) return r;
 
-  // 2) overlapping tiles (2×2 then 3×3) zoom into small / off-center codes
+  // 2) overlapping tiles (2×2 then 3×3) zoom into small / off-center codes.
+  //    Tiles skip TRY_HARDER (zooming in already enlarges the bars) to keep
+  //    the no-barcode case from dragging on.
   const W = base.width, H = base.height;
   for (const n of [2, 3]) {
     const tw = Math.ceil(W / n), th = Math.ceil(H / n);
     const stepX = Math.floor(tw / 2), stepY = Math.floor(th / 2);   // half-tile overlap
     for (let y = 0; y + 1 < H; y += stepY) {
       await yieldToUI();
+      if (performance.now() > deadline) break;
       for (let x = 0; x + 1 < W; x += stepX) {
         const cw = Math.min(tw, W - x), ch = Math.min(th, H - y);
         if (cw < 40 || ch < 40) continue;
-        r = tryDecode(cropCanvas(base, x, y, cw, ch), [ZXing.HybridBinarizer]);
+        r = tryDecode(cropCanvas(base, x, y, cw, ch), [ZXing.HybridBinarizer], FAST_HINTS);
         if (r) return r;
       }
     }
