@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salon Scheduler</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f7f3f0;
+      color: #2d2323;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────── */
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e8ddd7;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 800;
+      color: #7c4d3a;
+      letter-spacing: -0.4px;
+      flex-shrink: 0;
+    }
+    .logo span { color: #c4835a; }
+
+    .nav-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-nav {
+      width: 30px; height: 30px;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      background: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: #7c4d3a;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.13s;
+    }
+    .btn-nav:hover { background: #f5ede7; border-color: #c4835a; }
+
+    .btn-today {
+      height: 30px;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      background: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #7c4d3a;
+      padding: 0 11px;
+      transition: all 0.13s;
+    }
+    .btn-today:hover { background: #f5ede7; border-color: #c4835a; }
+
+    .period-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: #2d2323;
+      min-width: 220px;
+      white-space: nowrap;
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 2px;
+      background: #f0e6e0;
+      border-radius: 8px;
+      padding: 3px;
+      margin-left: auto;
+    }
+    .btn-view {
+      height: 26px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: #8a5a45;
+      cursor: pointer;
+      transition: all 0.13s;
+    }
+    .btn-view.active {
+      background: #fff;
+      color: #7c4d3a;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
+
+    .btn-add {
+      height: 34px;
+      padding: 0 16px;
+      background: #7c4d3a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      flex-shrink: 0;
+      transition: background 0.13s;
+    }
+    .btn-add:hover { background: #6b3f2f; }
+
+    .btn-import {
+      height: 34px;
+      padding: 0 14px;
+      background: none;
+      color: #7c4d3a;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      flex-shrink: 0;
+      transition: all 0.13s;
+    }
+    .btn-import:hover { background: #f5ede7; border-color: #c4835a; }
+
+    /* ── CALENDAR WRAPPER ────────────────────────────────── */
+    .cal-wrap {
+      padding: 20px 24px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* ── MONTH VIEW ──────────────────────────────────────── */
+    .month-grid {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    }
+
+    .month-dow-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      background: #f9f4f0;
+      border-bottom: 1px solid #ede4dd;
+    }
+    .month-dow {
+      padding: 9px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #8a6253;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      text-align: center;
+    }
+
+    .month-cells {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+    }
+
+    .mcell {
+      min-height: 118px;
+      min-width: 0;
+      overflow: hidden;
+      border-right: 1px solid #f3ece6;
+      border-bottom: 1px solid #f3ece6;
+      padding: 7px 8px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .mcell:nth-child(7n) { border-right: none; }
+    .mcell:hover { background: #fdf8f5; }
+    .mcell.other { background: #faf7f5; }
+    .mcell.other .mday { color: #ad9c92; }
+
+    .mday {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b5048;
+      width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      margin-bottom: 3px;
+    }
+    .mcell.today .mday {
+      background: #7c4d3a;
+      color: #fff;
+    }
+
+    .chip {
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .chip:hover { filter: brightness(0.93); }
+
+    /* "New since your last visit" highlight (inset ring survives overflow:hidden) */
+    .is-new { animation: newPulse 1.8s ease-in-out infinite; }
+    @keyframes newPulse {
+      0%, 100% { box-shadow: inset 0 0 0 2px #ff6a3d; }
+      50%      { box-shadow: inset 0 0 0 2px rgba(255,106,61,0.4); }
+    }
+    .new-tag {
+      display: inline-block;
+      background: #ff6a3d;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 2px 3px;
+      border-radius: 3px;
+      margin-right: 3px;
+      vertical-align: middle;
+      letter-spacing: 0.3px;
+    }
+
+    /* Deleted-since-last-visit tombstone: details stay legible, struck through */
+    .is-deleted { cursor: default; animation: none; }
+    .chip.is-deleted {
+      background: #efe9e6;
+      border-left: 3px solid #b9a99f;
+      color: #8a7d76;
+    }
+    .tgrid-appt.is-deleted {
+      background: #efe9e6;
+      border-left: 3px solid #b9a99f;
+      color: #8a7d76;
+      z-index: 9;
+    }
+    .is-deleted .del-text,
+    .is-deleted .ta-time,
+    .is-deleted .ta-name,
+    .is-deleted .ta-svc { text-decoration: line-through; }
+    .del-tag {
+      display: inline-block;
+      background: #8a7d76;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 2px 3px;
+      border-radius: 3px;
+      margin-right: 3px;
+      vertical-align: middle;
+      letter-spacing: 0.3px;
+      text-decoration: none;
+    }
+
+    .more-btn {
+      font-size: 11px;
+      font-weight: 700;
+      color: #7c4d3a;
+      cursor: pointer;
+      padding: 1px 4px;
+    }
+
+    /* ── WEEK/DAY TIME GRID ──────────────────────────────── */
+    .tgrid-outer {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    }
+
+    .tgrid-header {
+      display: flex;
+      border-bottom: 1px solid #ede4dd;
+      background: #f9f4f0;
+      position: sticky;
+      top: 60px;
+      z-index: 100;
+    }
+    .tgrid-corner {
+      width: 64px;
+      flex-shrink: 0;
+    }
+    .tgrid-day-head {
+      flex: 1;
+      padding: 8px 6px;
+      text-align: center;
+      border-left: 1px solid #f0e8e2;
+    }
+    .tgrid-day-head .dname {
+      font-size: 11px;
+      font-weight: 700;
+      color: #8a6253;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tgrid-day-head .dnum {
+      font-size: 22px;
+      font-weight: 800;
+      color: #6b5048;
+      line-height: 1.2;
+      margin-top: 1px;
+    }
+    .tgrid-day-head.today .dnum {
+      background: #7c4d3a;
+      color: #fff;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 2px auto 0;
+      font-size: 16px;
+    }
+
+    .tgrid-scroll {
+      overflow-y: auto;
+      max-height: calc(100vh - 140px);
+    }
+
+    .tgrid-body {
+      display: flex;
+      position: relative;
+    }
+
+    .time-col {
+      width: 64px;
+      flex-shrink: 0;
+    }
+    .time-label {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 0 10px;
+      padding-top: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #8f6a58;
+    }
+
+    .days-area {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+
+    .day-col {
+      flex: 1;
+      border-left: 1px solid #f0e8e2;
+      position: relative;
+    }
+
+    .hour-cell {
+      border-bottom: 1px solid #f3ece6;
+      position: relative;
+      cursor: pointer;
+    }
+    .hour-cell:hover { background: #fdf8f5; }
+    .half-line {
+      position: absolute;
+      top: 50%;
+      left: 0; right: 0;
+      border-top: 1px dashed #f0e8e2;
+      pointer-events: none;
+    }
+
+    .tgrid-appt {
+      position: absolute;
+      left: 3px; right: 3px;
+      border-radius: 5px;
+      padding: 3px 7px;
+      cursor: pointer;
+      overflow: hidden;
+      z-index: 10;
+      transition: filter 0.1s;
+    }
+    .tgrid-appt:hover { filter: brightness(0.9); z-index: 11; }
+    .tgrid-appt .ta-time { font-size: 10px; font-weight: 600; opacity: 0.8; }
+    .tgrid-appt .ta-name { font-size: 12px; font-weight: 700; line-height: 1.3; }
+    .tgrid-appt .ta-svc  { font-size: 11px; opacity: 0.75; }
+
+    /* Overflow indicator + dropdown for crowded time slots */
+    .stack-more {
+      position: absolute;
+      right: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      color: #fff;
+      background: #7c4d3a;
+      padding: 1px 6px;
+      border-radius: 9px;
+      cursor: pointer;
+      z-index: 16;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.25), 2px 2px 0 -1px rgba(124,77,58,0.45);
+      white-space: nowrap;
+    }
+    .stack-more:hover { background: #6b3f2f; }
+    .stack-panel {
+      display: none;
+      position: absolute;
+      left: 3px; right: 3px;
+      background: #fff;
+      border: 1px solid #e0d4cc;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      z-index: 30;
+      padding: 4px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .stack-panel-head {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #8a6253;
+      padding: 3px 6px 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .stack-close { cursor: pointer; font-size: 15px; line-height: 1; color: #8a6253; padding: 0 2px; }
+    .stack-close:hover { color: #2d2323; }
+    .stack-row {
+      border-radius: 5px;
+      padding: 4px 7px;
+      margin-bottom: 3px;
+      cursor: pointer;
+    }
+    .stack-row:last-child { margin-bottom: 0; }
+    .stack-row:hover { filter: brightness(0.94); }
+    .stack-row .sr-time { font-size: 10px; font-weight: 600; opacity: 0.8; }
+    .stack-row .sr-name { font-size: 12px; font-weight: 700; line-height: 1.3; }
+    .stack-row .sr-svc  { font-size: 11px; opacity: 0.75; }
+
+    .now-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 2px;
+      background: #e03c3c;
+      z-index: 20;
+      pointer-events: none;
+    }
+    .now-line::before {
+      content: '';
+      position: absolute;
+      left: -4px; top: -4px;
+      width: 10px; height: 10px;
+      background: #e03c3c;
+      border-radius: 50%;
+    }
+
+    /* Day view header */
+    .day-header {
+      padding: 14px 20px 12px;
+      border-bottom: 1px solid #ede4dd;
+      background: #f9f4f0;
+    }
+    .day-header h2 {
+      font-size: 18px;
+      font-weight: 800;
+      color: #2d2323;
+    }
+    .day-header p {
+      font-size: 12px;
+      color: #8a6253;
+      margin-top: 2px;
+    }
+
+    /* ── MODAL ───────────────────────────────────────────── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(30,10,5,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+      overflow: hidden;
+      animation: modal-in 0.18s ease;
+    }
+    @keyframes modal-in {
+      from { transform: scale(0.96) translateY(8px); opacity: 0; }
+      to   { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .modal-head {
+      background: linear-gradient(135deg, #7c4d3a, #9e6048);
+      color: #fff;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-head h3 { font-size: 17px; font-weight: 800; }
+    .btn-x {
+      background: none; border: none; color: #fff;
+      font-size: 22px; cursor: pointer; opacity: 0.75; line-height: 1;
+      padding: 2px 6px; border-radius: 4px;
+      transition: opacity 0.1s;
+    }
+    .btn-x:hover { opacity: 1; }
+
+    .modal-body { padding: 20px 22px; }
+
+    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .fg { margin-bottom: 14px; }
+    .fg label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #776560;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 5px;
+    }
+    .fg input, .fg select, .fg textarea {
+      width: 100%;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 14px;
+      color: #2d2323;
+      background: #fff;
+      font-family: inherit;
+      transition: border-color 0.13s;
+    }
+    .fg input:focus, .fg select:focus, .fg textarea:focus {
+      outline: none;
+      border-color: #7c4d3a;
+      box-shadow: 0 0 0 3px rgba(124,77,58,0.08);
+    }
+    .fg textarea { resize: vertical; min-height: 64px; }
+
+    .modal-foot {
+      padding: 14px 22px;
+      border-top: 1px solid #f0e6e0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-del {
+      background: none;
+      border: 1.5px solid #f0c8c4;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #c04040;
+      cursor: pointer;
+      margin-right: auto;
+      transition: all 0.13s;
+    }
+    .btn-del:hover { background: #fdf0ef; border-color: #c04040; }
+    .btn-cancel {
+      background: none;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #6b5048;
+      cursor: pointer;
+      transition: all 0.13s;
+    }
+    .btn-cancel:hover { background: #f5ede7; border-color: #c4835a; }
+    .btn-save {
+      background: #7c4d3a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.13s;
+    }
+    .btn-save:hover { background: #6b3f2f; }
+
+    /* Empty state */
+    .empty-day {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      gap: 6px;
+      color: #9c7c6a;
+      font-size: 12px;
+    }
+    .empty-day svg { opacity: 0.35; }
+
+    /* Appointment dots (mobile month view) */
+    .appt-dots { display: none; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
+    .appt-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Week horizontal scroll wrapper */
+    .week-x-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* ── MOBILE ──────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      /* Header: 2-row layout */
+      .header {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 10px 14px 8px;
+        gap: 8px;
+        row-gap: 8px;
+      }
+      .logo { order: 1; font-size: 16px; }
+      .btn-add { order: 2; margin-left: auto; height: 32px; padding: 0 12px; font-size: 12px; }
+      .btn-import { order: 2; height: 32px; padding: 0 10px; margin-left: 6px; }
+      .add-text { display: none; }
+      .nav-group { order: 3; }
+      .period-label { order: 4; flex: 1; font-size: 14px; min-width: unset; text-align: center; }
+      .view-toggle { order: 5; width: 100%; justify-content: stretch; margin-left: 0; }
+      .btn-view { flex: 1; }
+
+      /* Calendar padding */
+      .cal-wrap { padding: 10px 10px; }
+
+      /* Month cells: compact with dots */
+      .mcell { min-height: 60px; padding: 5px 5px 4px; }
+      .chip, .more-btn { display: none; }
+      .appt-dots { display: flex; }
+
+      /* Week view: single 2D scroll container — no nested scrolling */
+      .week-x-scroll {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        max-height: calc(100dvh - 130px);
+      }
+      .tgrid-scroll { overflow: visible; max-height: none; }
+      .tgrid-header {
+        position: sticky;
+        top: 0;
+        min-width: 580px;
+        z-index: 10;
+        background: #f9f4f0;
+      }
+      .tgrid-body   { min-width: 580px; }
+      .time-col {
+        position: sticky;
+        left: 0;
+        background: #fff;
+        z-index: 5;
+        width: 46px;
+      }
+      .tgrid-corner { width: 46px; background: #f9f4f0; }
+      .time-label   { padding: 0 6px; font-size: 10px; }
+      .tgrid-day-head .dnum { font-size: 16px; }
+      .tgrid-day-head.today .dnum { width: 28px; height: 28px; font-size: 13px; }
+
+      /* Day view header */
+      .day-header h2 { font-size: 15px; }
+      .day-header    { padding: 11px 14px 9px; }
+
+      /* Modal: bottom sheet */
+      .overlay { align-items: flex-end; padding: 0; }
+      .modal {
+        border-radius: 20px 20px 0 0;
+        max-height: 92dvh;
+        overflow-y: auto;
+        animation: sheet-up 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      @keyframes sheet-up {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0); }
+      }
+      .modal-head { padding: 14px 18px; }
+      .modal-head::before {
+        content: '';
+        display: block;
+        width: 36px; height: 4px;
+        background: rgba(255,255,255,0.4);
+        border-radius: 2px;
+        margin: 0 auto 12px;
+      }
+      .modal-body { padding: 16px 16px 8px; }
+      .modal-foot { padding: 12px 16px 24px; }
+
+      /* Form: single column */
+      .frow { grid-template-columns: 1fr; gap: 0; }
+
+      /* Bigger touch targets */
+      .fg input, .fg select, .fg textarea { padding: 11px 12px; font-size: 16px; }
+      .btn-nav  { width: 36px; height: 36px; }
+      .btn-save { padding: 11px 20px; font-size: 14px; }
+      .btn-cancel, .btn-del { padding: 11px 16px; font-size: 14px; }
+
+      /* Schedule row on mobile */
+      .schedule-group { order: 6; width: 100%; justify-content: space-between; }
+      .btn-set-hours .hours-text { display: none; }
+    }
+
+    /* ── SCHEDULE OVERLAY ────────────────────────────────── */
+    .schedule-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .schedule-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #8a6253;
+      white-space: nowrap;
+    }
+    .schedule-select {
+      height: 30px;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      padding: 0 8px;
+      font-size: 12px;
+      color: #7c4d3a;
+      background: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.13s;
+    }
+    .schedule-select:focus { outline: none; border-color: #7c4d3a; }
+
+    .btn-set-hours {
+      height: 30px;
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      background: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #7c4d3a;
+      padding: 0 11px;
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.13s;
+      flex-shrink: 0;
+    }
+    .btn-set-hours:hover { background: #f5ede7; border-color: #c4835a; }
+
+    /* Availability shading on time grid */
+    .avail-shade {
+      position: absolute;
+      left: 0; right: 0;
+      pointer-events: none;
+      z-index: 4;
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(150,120,100,0.07),
+        rgba(150,120,100,0.07) 3px,
+        transparent 3px,
+        transparent 9px
+      );
+    }
+    .avail-shade.day-off {
+      background: rgba(150,120,100,0.1);
+    }
+
+    /* ── AVAILABILITY MODAL ──────────────────────────────── */
+    .avail-day-card {
+      border: 1.5px solid #f0e8e2;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .avail-day-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .avail-day-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: #2d2323;
+    }
+    .avail-off-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #8a5a45;
+      cursor: pointer;
+    }
+    .avail-off-cb {
+      width: 15px; height: 15px;
+      cursor: pointer;
+      accent-color: #7c4d3a;
+    }
+    .avail-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .avail-time {
+      border: 1.5px solid #e0d4cc;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 13px;
+      color: #2d2323;
+      font-family: inherit;
+      width: 98px;
+      transition: border-color 0.13s;
+    }
+    .avail-time:focus { outline: none; border-color: #7c4d3a; }
+    .avail-sep { color: #8a6253; font-size: 12px; }
+    .avail-rm {
+      background: none;
+      border: 1.5px solid #f0c8c4;
+      border-radius: 6px;
+      color: #c04040;
+      cursor: pointer;
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: all 0.13s;
+    }
+    .avail-rm:hover { background: #fdf0ef; border-color: #c04040; }
+    .avail-add-block {
+      background: none;
+      border: 1.5px dashed #e0d4cc;
+      border-radius: 6px;
+      color: #7c4d3a;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      width: 100%;
+      transition: all 0.13s;
+      font-family: inherit;
+    }
+    .avail-add-block:hover { background: #f5ede7; border-color: #c4835a; }
+    .avail-day-card.is-off .avail-blocks,
+    .avail-day-card.is-off .avail-add-block { display: none; }
+    .avail-day-card.is-off { opacity: 0.55; }
+    @media (max-width: 640px) {
+      .avail-time { width: 82px; font-size: 14px; padding: 8px 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">Salon<span>Book</span></div>
+  <div class="nav-group">
+    <button class="btn-today" onclick="goToday()">Today</button>
+    <button class="btn-nav" onclick="nav(-1)">&#8249;</button>
+    <button class="btn-nav" onclick="nav(1)">&#8250;</button>
+  </div>
+  <div class="period-label" id="periodLabel"></div>
+  <div class="view-toggle">
+    <button class="btn-view" data-v="day"   onclick="setView('day')">Day</button>
+    <button class="btn-view" data-v="week"  onclick="setView('week')">Week</button>
+    <button class="btn-view active" data-v="month" onclick="setView('month')">Month</button>
+  </div>
+  <div class="schedule-group">
+    <span class="schedule-label">Schedule</span>
+    <select class="schedule-select" id="scheduleSelect" onchange="setOverlay(this.value)">
+      <option value="none">None</option>
+      <option>Emma</option>
+      <option>Uyen</option>
+      <option>Sophia</option>
+      <option>Olivia</option>
+      <option>Mia</option>
+      <option>Harper</option>
+    </select>
+    <button class="btn-set-hours" onclick="openAvail()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <span class="hours-text">Set Hours</span>
+    </button>
+  </div>
+  <button class="btn-add" onclick="openNew()">&#43; <span class="add-text">New Appointment</span></button>
+  <button class="btn-import" onclick="document.getElementById('icsInput').click()" title="Import .ics from Apple Calendar">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <span class="add-text">Import</span>
+  </button>
+  <input type="file" id="icsInput" accept=".ics" style="display:none" onchange="importIcs(this)" />
+  <a class="btn-import" href="../supabase/barcode.html" title="Scan barcode images">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M7 8v8M10 8v8M13 8v8M17 8v8" stroke-width="1.6"/></svg>
+    <span class="add-text">Barcodes</span>
+  </a>
+</header>
+
+<!-- CALENDAR -->
+<div class="cal-wrap" id="calWrap"></div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" style="display:none" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="mTitle">New Appointment</h3>
+      <button class="btn-x" onclick="closeModal()">&#215;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label>Client Name *</label>
+        <input id="fClient" type="text" placeholder="Full name" autocomplete="off" />
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Service *</label>
+          <select id="fService">
+            <option>Head Spa</option>
+            <option>Haircut</option>
+            <option>Color</option>
+            <option>Highlights</option>
+            <option>Balayage</option>
+            <option>Blowout</option>
+            <option>Perm</option>
+            <option>Treatment</option>
+            <option>Trim</option>
+            <option>Extensions</option>
+            <option>Consultation</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Stylist</label>
+          <select id="fStylist">
+            <option value="Any">Any Available</option>
+            <option>Emma</option>
+            <option>Uyen</option>
+            <option>Sophia</option>
+            <option>Olivia</option>
+            <option>Mia</option>
+            <option>Harper</option>
+          </select>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Date *</label>
+          <input id="fDate" type="date" />
+        </div>
+        <div class="fg">
+          <label>Start Time *</label>
+          <input id="fTime" type="time" />
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Duration</label>
+          <select id="fDuration">
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60" selected>1 hour</option>
+            <option value="90">1.5 hours</option>
+            <option value="120">2 hours</option>
+            <option value="150">2.5 hours</option>
+            <option value="180">3 hours</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Phone</label>
+          <input id="fPhone" type="tel" placeholder="(555) 000-0000" />
+        </div>
+      </div>
+      <div class="fg">
+        <label>Notes</label>
+        <textarea id="fNotes" placeholder="Preferences, allergies, special instructions…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-del" id="btnDel" style="display:none" onclick="deleteAppt()">Delete</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveAppt()">Save Appointment</button>
+    </div>
+  </div>
+</div>
+
+<!-- AVAILABILITY MODAL -->
+<div class="overlay" id="availModal" style="display:none" onclick="availModalClick(event)">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <h3>Employee Availability</h3>
+      <button class="btn-x" onclick="closeAvail()">&#215;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="margin-bottom:18px">
+        <label>Stylist</label>
+        <select id="availStylist" onchange="loadAvailForm()">
+          <option>Emma</option>
+          <option>Uyen</option>
+          <option>Sophia</option>
+          <option>Olivia</option>
+          <option>Mia</option>
+          <option>Harper</option>
+        </select>
+      </div>
+      <div id="availDays"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeAvail()">Cancel</button>
+      <button class="btn-save" id="availSaveBtn" onclick="saveAvail()">Save Hours</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// CONFIG
+// ================================================================
+const HOUR_START  = 7;    // 7 am
+const HOUR_END    = 21;   // 9 pm
+const HOUR_H      = 64;   // px per hour
+
+const DAYS_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYS_LONG   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS      = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+const STYLISTS    = ['Emma','Uyen','Sophia','Olivia','Mia','Harper'];
+
+const SVC_COLORS = {
+  'Head Spa':   { bg:'#ccfbf1', tx:'#0f766e', bd:'#2dd4bf' },
+  Haircut:      { bg:'#dbeafe', tx:'#1e3a8a', bd:'#93c5fd' },
+  Color:        { bg:'#fce7f3', tx:'#9d174d', bd:'#f9a8d4' },
+  Highlights:   { bg:'#fef9c3', tx:'#713f12', bd:'#fde047' },
+  Balayage:     { bg:'#ede9fe', tx:'#4c1d95', bd:'#c4b5fd' },
+  Blowout:      { bg:'#d1fae5', tx:'#065f46', bd:'#6ee7b7' },
+  Perm:         { bg:'#fee2e2', tx:'#991b1b', bd:'#fca5a5' },
+  Treatment:    { bg:'#e0f2fe', tx:'#0c4a6e', bd:'#7dd3fc' },
+  Trim:         { bg:'#f0fdf4', tx:'#14532d', bd:'#86efac' },
+  Extensions:   { bg:'#fdf4ff', tx:'#6b21a8', bd:'#e879f9' },
+  Consultation: { bg:'#f1f5f9', tx:'#1e293b', bd:'#94a3b8' },
+};
+function clr(svc) { return SVC_COLORS[svc] || { bg:'#f5ede7', tx:'#7c4d3a', bd:'#c4835a' }; }
+
+// ================================================================
+// API  (browser → api.php → MySQL)
+// ================================================================
+async function api(action, body) {
+  const opts = body
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    : { method: 'GET' };
+  const res  = await fetch(`api.php?action=${action}`, opts);
+  const json = await res.json().catch(() => ({ error: 'Invalid server response' }));
+  if (!res.ok || json.error) throw new Error(json.error || ('HTTP ' + res.status));
+  return json;
+}
+
+function toRow(a) {
+  return {
+    id: a.id, client_name: a.clientName, service: a.service,
+    stylist: a.stylist, date: a.date, time: a.time,
+    duration: a.duration, phone: a.phone || null, notes: a.notes || null,
+    updated_at: new Date().toISOString()
+  };
+}
+function fromRow(r) {
+  return {
+    id: r.id, clientName: r.client_name, service: r.service,
+    stylist: r.stylist, date: r.date, time: r.time,
+    duration: r.duration, phone: r.phone || '', notes: r.notes || '',
+    createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at
+  };
+}
+
+// ================================================================
+// STATE
+// ================================================================
+let cur            = new Date();
+let view           = 'month';
+let appts          = [];
+let editId         = null;
+let overlayStylest = 'none';
+let availability   = {}; // { stylist: { "0": null, "1": {start,end}, ... } }
+let newBaseline    = null;          // epoch ms of this device's previous visit
+const selfIds      = new Set();     // appts created on THIS device this session
+let stackSeq       = 0;             // unique ids for overflow dropdown panels
+
+// ================================================================
+// UTILS
+// ================================================================
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function parseYmd(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function fmt12(t) {
+  const [h,m] = t.split(':').map(Number);
+  return `${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;
+}
+function isToday(d) {
+  const n = new Date();
+  return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate();
+}
+function weekStart(d) {
+  const w = new Date(d);
+  w.setDate(w.getDate() - w.getDay());
+  return w;
+}
+function byDate(dateStr) {
+  return appts.filter(a=>a.date===dateStr && !a.deletedAt).sort((a,b)=>a.time.localeCompare(b.time));
+}
+// Appointments deleted by someone else since this device's previous visit (transient tombstones)
+function deletedSince(dateStr) {
+  return appts.filter(a => a.date===dateStr && a.deletedAt
+      && newBaseline !== null && new Date(a.deletedAt).getTime() > newBaseline
+      && !selfIds.has(a.id))
+    .sort((a,b)=>a.time.localeCompare(b.time));
+}
+function timeTop(timeStr) {
+  const [h,m] = timeStr.split(':').map(Number);
+  return ((h*60+m) - HOUR_START*60) / 60 * HOUR_H;
+}
+function durationH(mins) { return mins / 60 * HOUR_H; }
+// "New" = added or edited by someone else since this device's previous visit
+function isNew(a) {
+  const ts = a.updatedAt || a.createdAt; // updated_at bumps on every save; created_at is the fallback
+  return ts && newBaseline !== null
+    && new Date(ts).getTime() > newBaseline
+    && !selfIds.has(a.id);
+}
+
+// ================================================================
+// NAV
+// ================================================================
+function nav(dir) {
+  if (view==='month') cur = new Date(cur.getFullYear(), cur.getMonth()+dir, 1);
+  else if (view==='week') cur = new Date(cur.getTime() + dir*7*86400000);
+  else cur = new Date(cur.getTime() + dir*86400000);
+  render();
+}
+function goToday() { cur = new Date(); render(); }
+function setView(v) {
+  view = v;
+  document.querySelectorAll('.btn-view').forEach(b => b.classList.toggle('active', b.dataset.v===v));
+  render();
+}
+
+// ================================================================
+// RENDER DISPATCHER
+// ================================================================
+function render() {
+  updateLabel();
+  const wrap = document.getElementById('calWrap');
+  if      (view==='month') renderMonth(wrap);
+  else if (view==='week')  renderWeek(wrap);
+  else                     renderDay(wrap);
+}
+
+function updateLabel() {
+  const el = document.getElementById('periodLabel');
+  if (view==='month') {
+    el.textContent = `${MONTHS[cur.getMonth()]} ${cur.getFullYear()}`;
+  } else if (view==='week') {
+    const ws = weekStart(cur);
+    const we = new Date(ws.getTime()+6*86400000);
+    el.textContent = ws.getMonth()===we.getMonth()
+      ? `${MONTHS[ws.getMonth()]} ${ws.getDate()}–${we.getDate()}, ${ws.getFullYear()}`
+      : `${MONTHS[ws.getMonth()]} ${ws.getDate()} – ${MONTHS[we.getMonth()]} ${we.getDate()}, ${ws.getFullYear()}`;
+  } else {
+    el.textContent = `${DAYS_LONG[cur.getDay()]}, ${MONTHS[cur.getMonth()]} ${cur.getDate()}, ${cur.getFullYear()}`;
+  }
+}
+
+// ================================================================
+// MONTH VIEW
+// ================================================================
+function renderMonth(wrap) {
+  const y = cur.getFullYear(), mo = cur.getMonth();
+  const firstDow = new Date(y,mo,1).getDay();
+  const daysInMo = new Date(y,mo+1,0).getDate();
+  const prevDays = new Date(y,mo,0).getDate();
+
+  let cells = '';
+
+  // Prev-month padding
+  for (let i=firstDow-1; i>=0; i--) {
+    cells += monthCell(new Date(y,mo-1,prevDays-i), true);
+  }
+  // Current month
+  for (let d=1; d<=daysInMo; d++) cells += monthCell(new Date(y,mo,d), false);
+  // Next-month padding
+  const total = firstDow + daysInMo;
+  const tail  = total%7===0 ? 0 : 7-(total%7);
+  for (let d=1; d<=tail; d++) cells += monthCell(new Date(y,mo+1,d), true);
+
+  wrap.innerHTML = `
+    <div class="month-grid">
+      <div class="month-dow-row">
+        ${DAYS_SHORT.map(d=>`<div class="month-dow">${d}</div>`).join('')}
+      </div>
+      <div class="month-cells">${cells}</div>
+    </div>`;
+}
+
+function monthCell(date, other) {
+  const d     = ymd(date);
+  const list  = byDate(d);
+  const today = isToday(date) ? ' today' : '';
+  const cls   = other ? ' other' : '';
+  const MAX   = 3;
+
+  const chips = list.slice(0,MAX).map(a => {
+    const c = clr(a.service);
+    const nw = isNew(a);
+    return `<div class="chip${nw?' is-new':''}" style="background:${c.bg};color:${c.tx};border-left:3px solid ${c.bd}"
+      onclick="event.stopPropagation();openEdit('${a.id}')"
+      title="${a.clientName} · ${a.service}">${nw?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)} ${a.clientName}</div>`;
+  }).join('');
+
+  const more = list.length>MAX ? `<div class="more-btn">+${list.length-MAX} more</div>` : '';
+
+  const del = deletedSince(d);
+  const ghosts = del.map(a =>
+    `<div class="chip is-deleted" title="Deleted: ${a.clientName} · ${a.service} · ${fmt12(a.time)}"
+      ><span class="del-tag">DELETED</span><span class="del-text">${fmt12(a.time)} ${a.clientName}</span></div>`
+  ).join('');
+
+  const dots = list.slice(0,4).map(a => {
+    const c = clr(a.service);
+    const bg = isNew(a) ? '#ff6a3d' : c.bd; // new events get an orange dot on mobile
+    return `<div class="appt-dot" style="background:${bg}" title="${a.clientName}"></div>`;
+  }).join('');
+  const delDots = del.slice(0,4).map(a =>
+    `<div class="appt-dot" style="background:#b9a99f" title="Deleted: ${a.clientName}"></div>`
+  ).join('');
+
+  return `<div class="mcell${today}${cls}" onclick="clickDay('${d}')">
+    <div class="mday">${date.getDate()}</div>
+    ${chips}${ghosts}${more}
+    <div class="appt-dots">${dots}${delDots}</div>
+  </div>`;
+}
+
+// ================================================================
+// WEEK VIEW
+// ================================================================
+function renderWeek(wrap) {
+  const ws   = weekStart(cur);
+  const days = Array.from({length:7}, (_,i) => new Date(ws.getTime()+i*86400000));
+  const gh   = (HOUR_END-HOUR_START)*HOUR_H;
+
+  const dayHeads = days.map(d => {
+    const tc = isToday(d) ? ' today' : '';
+    return `<div class="tgrid-day-head${tc}">
+      <div class="dname">${DAYS_SHORT[d.getDay()]}</div>
+      <div class="dnum">${d.getDate()}</div>
+    </div>`;
+  }).join('');
+
+  const timeLabels = Array.from({length: HOUR_END-HOUR_START}, (_,i) => {
+    const h = HOUR_START+i;
+    const lbl = h<12 ? `${h}am` : h===12 ? '12pm' : `${h-12}pm`;
+    return `<div class="time-label" style="height:${HOUR_H}px">${lbl}</div>`;
+  }).join('');
+
+  const dayCols = days.map(d => {
+    const rows = Array.from({length: HOUR_END-HOUR_START}, (_,i) => {
+      const h   = HOUR_START+i;
+      const tStr = `${String(h).padStart(2,'0')}:00`;
+      return `<div class="hour-cell" style="height:${HOUR_H}px"
+        onclick="clickSlot('${ymd(d)}','${tStr}')"><div class="half-line"></div></div>`;
+    }).join('');
+
+    const apts = apptsLayout(byDate(ymd(d)), { gap:3, minH:18, border:3, inner: weekApptInner });
+    const ghosts = deletedSince(ymd(d)).map(a => weekGhost(a)).join('');
+    const nl   = isToday(d) ? nowLine() : '';
+
+    return `<div class="day-col" style="height:${gh}px">${rows}${apts}${ghosts}${nl}${availOverlay(d.getDay())}</div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="tgrid-outer">
+      <div class="week-x-scroll">
+        <div class="tgrid-header">
+          <div class="tgrid-corner"></div>${dayHeads}
+        </div>
+        <div class="tgrid-scroll">
+          <div class="tgrid-body" style="height:${gh}px">
+            <div class="time-col">${timeLabels}</div>
+            <div class="days-area">${dayCols}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  scrollToNow();
+}
+
+// Group time-overlapping appointments (sorted by start) into clusters.
+function buildClusters(list) {
+  const clusters = [];
+  let cur = null, curEnd = -1;
+  for (const a of list) {
+    const [h,m] = a.time.split(':').map(Number);
+    const start = h*60 + m;
+    const end   = start + (a.duration || 0);
+    if (cur && start < curEnd) { cur.push(a); curEnd = Math.max(curEnd, end); }
+    else { cur = [a]; clusters.push(cur); curEnd = end; }
+  }
+  return clusters;
+}
+
+// Lay out a day's appointments: overlapping ones split the width (up to 3
+// side by side); a 4th+ collapses into a "+N" dropdown that lists the full slot.
+// opts: { gap, minH, border, inner(a) }
+function apptsLayout(list, opts) {
+  if (!list.length) return '';
+  let html = '';
+  for (const cl of buildClusters(list)) {
+    const n  = cl.length;
+    const vc = Math.min(n, 3);              // visible side-by-side columns
+    const colW = 100 / vc;
+    cl.forEach((a, i) => {
+      if (i >= vc) return;                  // overflow → lives in the dropdown
+      const top  = timeTop(a.time);
+      const h    = Math.max(durationH(a.duration)-2, opts.minH);
+      const c    = clr(a.service);
+      const nw   = isNew(a);
+      const left = `calc(${i*colW}% + ${opts.gap}px)`;
+      const wid  = `calc(${colW}% - ${opts.gap*2}px)`;
+      html += `<div class="tgrid-appt${nw?' is-new':''}" style="top:${top}px;height:${h}px;left:${left};width:${wid};right:auto;background:${c.bg};color:${c.tx};border-left:${opts.border}px solid ${c.bd}"
+        onclick="event.stopPropagation();openEdit('${a.id}')">${opts.inner(a)}</div>`;
+    });
+    if (n > vc) {
+      const top = timeTop(cl[0].time);
+      const pid = 'stk'+(stackSeq++);
+      const rows = cl.map(a => {
+        const c = clr(a.service);
+        return `<div class="stack-row" style="background:${c.bg};color:${c.tx};border-left:4px solid ${c.bd}"
+          onclick="event.stopPropagation();openEdit('${a.id}')">
+          <div class="sr-time">${isNew(a)?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)} · ${a.duration} min</div>
+          <div class="sr-name">${a.clientName}</div>
+          <div class="sr-svc">${a.service}${a.stylist!=='Any' ? ' · '+a.stylist : ''}</div>
+        </div>`;
+      }).join('');
+      html += `<div class="stack-more" style="top:${top+2}px" onclick="toggleStack(event,'${pid}')">+${n-vc}</div>
+        <div class="stack-panel" id="${pid}" style="top:${top}px">
+          <div class="stack-panel-head">${n} at ${fmt12(cl[0].time)}<span class="stack-close" onclick="toggleStack(event,'${pid}')">×</span></div>
+          ${rows}
+        </div>`;
+    }
+  }
+  return html;
+}
+
+function toggleStack(e, id) {
+  e.stopPropagation();
+  const p = document.getElementById(id);
+  if (p) p.style.display = p.style.display === 'block' ? 'none' : 'block';
+}
+
+function weekApptInner(a) {
+  const nw = isNew(a);
+  return `<div class="ta-time">${nw?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)}</div>
+    <div class="ta-name">${a.clientName}</div>`;
+}
+function dayApptInner(a) {
+  const nw = isNew(a);
+  return `<div class="ta-time">${nw?'<span class="new-tag">NEW</span>':''}${fmt12(a.time)} · ${a.duration} min</div>
+    <div class="ta-name">${a.clientName}</div>
+    <div class="ta-svc">${a.service}${a.stylist!=='Any' ? ' · '+a.stylist : ''}</div>`;
+}
+
+function weekGhost(a) {
+  const top = timeTop(a.time);
+  const h   = Math.max(durationH(a.duration)-2, 18);
+  return `<div class="tgrid-appt is-deleted" style="top:${top}px;height:${h}px">
+    <div class="ta-time"><span class="del-tag">DELETED</span>${fmt12(a.time)}</div>
+    <div class="ta-name">${a.clientName}</div>
+  </div>`;
+}
+
+// ================================================================
+// DAY VIEW
+// ================================================================
+function renderDay(wrap) {
+  const d   = ymd(cur);
+  const list = byDate(d);
+  const gh  = (HOUR_END-HOUR_START)*HOUR_H;
+
+  const timeLabels = Array.from({length: HOUR_END-HOUR_START}, (_,i) => {
+    const h = HOUR_START+i;
+    const lbl = h<12 ? `${h}am` : h===12 ? '12pm' : `${h-12}pm`;
+    return `<div class="time-label" style="height:${HOUR_H}px">${lbl}</div>`;
+  }).join('');
+
+  const rows = Array.from({length: HOUR_END-HOUR_START}, (_,i) => {
+    const h    = HOUR_START+i;
+    const tStr = `${String(h).padStart(2,'0')}:00`;
+    return `<div class="hour-cell" style="height:${HOUR_H}px"
+      onclick="clickSlot('${d}','${tStr}')"><div class="half-line"></div></div>`;
+  }).join('');
+
+  const apts = apptsLayout(list, { gap:4, minH:28, border:4, inner: dayApptInner });
+
+  const ghosts = deletedSince(d).map(a => {
+    const top  = timeTop(a.time);
+    const h    = Math.max(durationH(a.duration)-2, 28);
+    return `<div class="tgrid-appt is-deleted" style="top:${top}px;height:${h}px;left:4px;right:4px">
+      <div class="ta-time"><span class="del-tag">DELETED</span>${fmt12(a.time)} · ${a.duration} min</div>
+      <div class="ta-name">${a.clientName}</div>
+      <div class="ta-svc">${a.service}${a.stylist!=='Any' ? ' · '+a.stylist : ''}</div>
+    </div>`;
+  }).join('');
+
+  const nl = isToday(cur) ? nowLine() : '';
+
+  const emptyState = list.length===0 ? `
+    <div class="empty-day">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+      <span>No appointments — click a time slot to add one</span>
+    </div>` : '';
+
+  wrap.innerHTML = `
+    <div class="tgrid-outer">
+      <div class="day-header">
+        <h2>${DAYS_LONG[cur.getDay()]}, ${MONTHS[cur.getMonth()]} ${cur.getDate()}, ${cur.getFullYear()}</h2>
+        <p>${list.length} appointment${list.length!==1?'s':''}</p>
+      </div>
+      <div class="tgrid-scroll">
+        <div class="tgrid-body" style="height:${gh}px">
+          <div class="time-col">${timeLabels}</div>
+          <div class="days-area">
+            <div class="day-col" style="height:${gh}px;position:relative">
+              ${rows}${apts}${ghosts}${nl}${emptyState}${availOverlay(cur.getDay())}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  scrollToNow();
+}
+
+// ================================================================
+// NOW LINE
+// ================================================================
+function nowLine() {
+  const n    = new Date();
+  const mins = n.getHours()*60 + n.getMinutes();
+  const s    = HOUR_START*60, e = HOUR_END*60;
+  if (mins<s || mins>e) return '';
+  const top = ((mins-s)/60)*HOUR_H;
+  return `<div class="now-line" style="top:${top}px"></div>`;
+}
+
+function scrollToNow() {
+  requestAnimationFrame(() => {
+    const sc = document.querySelector('.tgrid-scroll');
+    if (!sc) return;
+    const now  = new Date();
+    const mins = now.getHours()*60+now.getMinutes();
+    const s    = HOUR_START*60;
+    if (mins>s) {
+      const top = ((mins-s)/60)*HOUR_H - 120;
+      sc.scrollTop = Math.max(0,top);
+    }
+  });
+}
+
+// ================================================================
+// MODAL HELPERS
+// ================================================================
+function fillModal(dateStr, timeStr) {
+  document.getElementById('mTitle').textContent    = 'New Appointment';
+  document.getElementById('btnDel').style.display  = 'none';
+  document.getElementById('fClient').value   = '';
+  document.getElementById('fService').value  = 'Haircut';
+  document.getElementById('fStylist').value  = 'Any';
+  document.getElementById('fDate').value     = dateStr || ymd(cur);
+  document.getElementById('fTime').value     = timeStr || '10:00';
+  document.getElementById('fDuration').value = '60';
+  document.getElementById('fPhone').value    = '';
+  document.getElementById('fNotes').value    = '';
+}
+
+function openNew() {
+  editId = null;
+  fillModal(ymd(cur), '10:00');
+  document.getElementById('overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('fClient').focus(), 60);
+}
+
+function clickDay(dateStr) {
+  cur = parseYmd(dateStr);
+  setView('day');
+}
+
+function clickSlot(dateStr, timeStr) {
+  editId = null;
+  fillModal(dateStr, timeStr);
+  document.getElementById('overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('fClient').focus(), 60);
+}
+
+function openEdit(id) {
+  const a = appts.find(x=>x.id===id);
+  if (!a) return;
+  editId = id;
+  document.getElementById('mTitle').textContent    = 'Edit Appointment';
+  document.getElementById('btnDel').style.display  = 'block';
+  document.getElementById('fClient').value   = a.clientName;
+  document.getElementById('fService').value  = a.service;
+  document.getElementById('fStylist').value  = a.stylist;
+  document.getElementById('fDate').value     = a.date;
+  document.getElementById('fTime').value     = a.time;
+  document.getElementById('fDuration').value = String(a.duration);
+  document.getElementById('fPhone').value    = a.phone  || '';
+  document.getElementById('fNotes').value    = a.notes  || '';
+  document.getElementById('overlay').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('overlay').style.display = 'none';
+  editId = null;
+}
+function overlayClick(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
+
+async function saveAppt() {
+  const client = document.getElementById('fClient').value.trim();
+  const date   = document.getElementById('fDate').value;
+  const time   = document.getElementById('fTime').value;
+  if (!client) { alert('Please enter a client name.'); return; }
+  if (!date)   { alert('Please select a date.'); return; }
+  if (!time)   { alert('Please select a time.'); return; }
+
+  const a = {
+    id:         editId || `a${Date.now()}${Math.random().toString(36).slice(2,6)}`,
+    clientName: client,
+    service:    document.getElementById('fService').value,
+    stylist:    document.getElementById('fStylist').value,
+    date, time,
+    duration:   parseInt(document.getElementById('fDuration').value),
+    phone:      document.getElementById('fPhone').value.trim(),
+    notes:      document.getElementById('fNotes').value.trim(),
+  };
+
+  const btn = document.querySelector('.btn-save');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+
+  try {
+    await api('upsertAppts', { rows: [toRow(a)] });
+  } catch (e) {
+    btn.textContent = 'Save Appointment';
+    btn.disabled = false;
+    alert('Error saving: ' + e.message);
+    return;
+  }
+  btn.textContent = 'Save Appointment';
+  btn.disabled = false;
+
+  if (editId) appts = appts.map(x => x.id===editId ? a : x);
+  else        appts.push(a);
+  selfIds.add(a.id); // don't flag your own add/edit as NEW on your own device
+
+  closeModal();
+  render();
+}
+
+async function deleteAppt() {
+  if (!editId || !confirm('Delete this appointment?')) return;
+
+  // Soft delete: stamp deleted_at so other devices can show it as a change.
+  const ts = new Date().toISOString();
+  try {
+    await api('deleteAppt', { id: editId, deleted_at: ts });
+  } catch (e) {
+    alert('Error deleting: ' + e.message);
+    return;
+  }
+
+  selfIds.add(editId); // don't show our own deletion as a change on this device
+  appts = appts.map(x => x.id===editId ? { ...x, deletedAt: ts } : x);
+  closeModal();
+  render();
+}
+
+// ================================================================
+// AVAILABILITY OVERLAY
+// ================================================================
+function setOverlay(val) {
+  overlayStylest = val;
+  render();
+}
+
+function normalizeBlocks(val) {
+  if (val === null || val === undefined) return null;
+  if (Array.isArray(val)) return val.length ? val : null;
+  return [val]; // migrate old single {start,end} format
+}
+
+function availOverlay(dayOfWeek) {
+  if (overlayStylest === 'none') return '';
+  const hours = availability[overlayStylest];
+  if (!hours) return '';
+  const blocks = normalizeBlocks(hours[String(dayOfWeek)]);
+  const gh     = (HOUR_END - HOUR_START) * HOUR_H;
+  const gridS  = HOUR_START * 60;
+  const gridE  = HOUR_END   * 60;
+
+  if (!blocks) {
+    return `<div class="avail-shade day-off" style="top:0;height:${gh}px" title="${overlayStylest} — day off"></div>`;
+  }
+
+  const sorted = [...blocks].sort((a, b) => a.start.localeCompare(b.start));
+  let html = '', prevEnd = gridS;
+
+  for (const block of sorted) {
+    const [sh, sm] = block.start.split(':').map(Number);
+    const [eh, em] = block.end.split(':').map(Number);
+    const startM = sh * 60 + sm;
+    const endM   = eh * 60 + em;
+    if (startM > prevEnd) {
+      const top = ((prevEnd - gridS) / 60) * HOUR_H;
+      const h   = ((startM - prevEnd) / 60) * HOUR_H;
+      html += `<div class="avail-shade" style="top:${top}px;height:${h}px"></div>`;
+    }
+    prevEnd = Math.max(prevEnd, endM);
+  }
+  if (prevEnd < gridE) {
+    const top = ((prevEnd - gridS) / 60) * HOUR_H;
+    const h   = ((gridE - prevEnd) / 60) * HOUR_H;
+    html += `<div class="avail-shade" style="top:${top}px;height:${h}px"></div>`;
+  }
+  return html;
+}
+
+// ================================================================
+// AVAILABILITY MODAL
+// ================================================================
+function openAvail() {
+  loadAvailForm();
+  document.getElementById('availModal').style.display = 'flex';
+}
+function closeAvail() {
+  document.getElementById('availModal').style.display = 'none';
+}
+function availModalClick(e) {
+  if (e.target === document.getElementById('availModal')) closeAvail();
+}
+
+function blockHtml(dow, blocks) {
+  return blocks.map((b, i) => `
+    <div class="avail-block" id="ablk-${dow}-${i}">
+      <input type="time" class="avail-time" id="astart-${dow}-${i}" value="${b.start}">
+      <span class="avail-sep">to</span>
+      <input type="time" class="avail-time" id="aend-${dow}-${i}" value="${b.end}">
+      <button class="avail-rm" onclick="removeBlock(${dow},${i})">&#215;</button>
+    </div>`).join('');
+}
+
+function loadAvailForm() {
+  const stylist = document.getElementById('availStylist').value;
+  const hours   = availability[stylist] || {};
+  document.getElementById('availDays').innerHTML = DAYS_LONG.map((day, dow) => {
+    const blocks = normalizeBlocks(hours[String(dow)]);
+    const isOff  = !blocks;
+    const initial = blocks || [{ start: '09:00', end: '18:00' }];
+    return `<div class="avail-day-card${isOff ? ' is-off' : ''}" id="acard-${dow}">
+      <div class="avail-day-head">
+        <span class="avail-day-name">${day}</span>
+        <label class="avail-off-label">
+          <input type="checkbox" class="avail-off-cb" id="aoff-${dow}"
+            ${isOff ? 'checked' : ''} onchange="toggleDayOff(${dow})"> Off
+        </label>
+      </div>
+      <div class="avail-blocks" id="ablocks-${dow}">${blockHtml(dow, initial)}</div>
+      <button class="avail-add-block" onclick="addBlock(${dow})">+ Add time block</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleDayOff(dow) {
+  const isOff = document.getElementById(`aoff-${dow}`).checked;
+  document.getElementById(`acard-${dow}`).classList.toggle('is-off', isOff);
+}
+
+function collectBlocks(dow) {
+  const blocks = [];
+  document.getElementById(`ablocks-${dow}`).querySelectorAll('.avail-block').forEach((_, i) => {
+    const s = document.getElementById(`astart-${dow}-${i}`)?.value;
+    const e = document.getElementById(`aend-${dow}-${i}`)?.value;
+    if (s && e) blocks.push({ start: s, end: e });
+  });
+  return blocks;
+}
+
+function rebuildBlocks(dow, blocks) {
+  document.getElementById(`ablocks-${dow}`).innerHTML = blockHtml(dow, blocks);
+}
+
+function addBlock(dow) {
+  const blocks = collectBlocks(dow);
+  const last   = blocks[blocks.length - 1];
+  let newStart = '09:00', newEnd = '18:00';
+  if (last) {
+    const [h, m] = last.end.split(':').map(Number);
+    const sM = h * 60 + m + 60;
+    const eM = Math.min(sM + 120, HOUR_END * 60);
+    if (sM < HOUR_END * 60) {
+      newStart = `${String(Math.floor(sM/60)).padStart(2,'0')}:${String(sM%60).padStart(2,'0')}`;
+      newEnd   = `${String(Math.floor(eM/60)).padStart(2,'0')}:${String(eM%60).padStart(2,'0')}`;
+    }
+  }
+  blocks.push({ start: newStart, end: newEnd });
+  rebuildBlocks(dow, blocks);
+}
+
+function removeBlock(dow, idx) {
+  const blocks = collectBlocks(dow);
+  blocks.splice(idx, 1);
+  rebuildBlocks(dow, blocks);
+}
+
+async function saveAvail() {
+  const stylist = document.getElementById('availStylist').value;
+  const hours   = {};
+  for (let dow = 0; dow < 7; dow++) {
+    hours[String(dow)] = document.getElementById(`aoff-${dow}`).checked
+      ? null : collectBlocks(dow);
+  }
+
+  const btn = document.getElementById('availSaveBtn');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+
+  try {
+    await api('saveAvail', { stylist, hours });
+  } catch (e) {
+    btn.textContent = 'Save Hours';
+    btn.disabled = false;
+    alert('Error saving: ' + e.message);
+    return;
+  }
+  btn.textContent = 'Save Hours';
+  btn.disabled = false;
+
+  availability[stylist] = hours;
+  closeAvail();
+  render();
+}
+
+// ================================================================
+// KEYBOARD
+// ================================================================
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') closeModal();
+  if (e.key==='ArrowLeft'  && e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') nav(-1);
+  if (e.key==='ArrowRight' && e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') nav(1);
+});
+
+// ================================================================
+// SWIPE
+// ================================================================
+(function() {
+  let tx = 0, ty = 0;
+  document.addEventListener('touchstart', e => {
+    tx = e.touches[0].clientX;
+    ty = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    const dy = e.changedTouches[0].clientY - ty;
+    // Only swipe if horizontal movement dominates and overlay is closed
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (document.getElementById('overlay').style.display !== 'none') return;
+    // Don't swipe if touching a horizontally scrollable element
+    const el = e.target.closest('.week-x-scroll, .tgrid-scroll');
+    if (el) return;
+    nav(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
+// ================================================================
+// ICS IMPORT
+// ================================================================
+function parseIcs(text) {
+  const unfolded = text.replace(/\r?\n[ \t]/g, '');
+  const lines    = unfolded.split(/\r?\n/);
+  const events   = [];
+  let cur        = null;
+
+  for (const raw of lines) {
+    const colon = raw.indexOf(':');
+    if (colon === -1) continue;
+    const key = raw.slice(0, colon).toUpperCase();
+    const val = raw.slice(colon + 1);
+
+    if (key === 'BEGIN' && val === 'VEVENT') { cur = {}; continue; }
+    if (key === 'END'   && val === 'VEVENT') { if (cur) events.push(cur); cur = null; continue; }
+    if (!cur) continue;
+
+    const baseKey = key.split(';')[0];
+    if (baseKey === 'SUMMARY')     cur.summary     = val;
+    if (baseKey === 'DESCRIPTION') cur.description = val.replace(/\\n/g, '\n').replace(/\\,/g, ',');
+    if (baseKey === 'DTSTART')     cur.dtstart     = val;
+    if (baseKey === 'DTEND')       cur.dtend       = val;
+  }
+  return events;
+}
+
+function parseIcsDate(dtStr) {
+  const s      = dtStr.replace('Z', '');
+  const allDay = s.length === 8;
+  const yr = parseInt(s.slice(0,4)), mo = parseInt(s.slice(4,6))-1, dy = parseInt(s.slice(6,8));
+  if (allDay) return { date: new Date(yr, mo, dy), allDay: true };
+  const hr = parseInt(s.slice(9,11)), mn = parseInt(s.slice(11,13));
+  const date = dtStr.endsWith('Z')
+    ? new Date(Date.UTC(yr, mo, dy, hr, mn))
+    : new Date(yr, mo, dy, hr, mn);
+  return { date, allDay: false };
+}
+
+async function importIcs(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  const events = parseIcs(await file.text());
+  if (!events.length) { alert('No events found in this .ics file.'); return; }
+
+  const toImport = [];
+  for (const ev of events) {
+    if (!ev.dtstart) continue;
+    const start = parseIcsDate(ev.dtstart);
+    let timeStr = '10:00', duration = 60;
+
+    if (!start.allDay) {
+      const h = start.date.getHours(), m = start.date.getMinutes();
+      timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+    if (ev.dtend) {
+      const end   = parseIcsDate(ev.dtend);
+      const diffM = Math.round((end.date - start.date) / 60000);
+      if (diffM > 0) duration = diffM;
+    }
+
+    toImport.push({
+      id:         `ics${Date.now()}${Math.random().toString(36).slice(2,6)}`,
+      clientName: ev.summary || 'Imported Event',
+      service:    'Haircut',
+      stylist:    'Any',
+      date:       ymd(start.date),
+      time:       timeStr,
+      duration,
+      phone:      '',
+      notes:      ev.description || '',
+    });
+  }
+
+  if (!toImport.length) { alert('No valid events found to import.'); return; }
+  if (!confirm(`Import ${toImport.length} event${toImport.length!==1?'s':''} from "${file.name}"?`)) return;
+
+  try {
+    await api('upsertAppts', { rows: toImport.map(toRow) });
+  } catch (e) {
+    alert('Import failed: ' + e.message);
+    return;
+  }
+
+  appts.push(...toImport);
+  toImport.forEach(a => selfIds.add(a.id)); // your own import isn't "new from others"
+  render();
+  alert(`Imported ${toImport.length} appointment${toImport.length!==1?'s':''}.`);
+}
+
+// ================================================================
+// BOOT
+// ================================================================
+async function init() {
+  // Show loading state
+  document.getElementById('calWrap').innerHTML =
+    `<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#8a6253;font-size:14px;gap:10px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+      </svg>
+      Loading appointments…
+     </div>
+     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+
+  let data;
+  try {
+    data = await api('load');
+  } catch (e) {
+    document.getElementById('calWrap').innerHTML =
+      `<div style="padding:40px;color:#c04040;font-size:14px">Failed to load: ${e.message}</div>`;
+    return;
+  }
+
+  appts = data.appointments.map(fromRow);
+  data.availability.forEach(row => { availability[row.stylist] = row.hours; });
+
+  // Per-device memory of last visit. localStorage is inherently per-device,
+  // so it doubles as the "device id" — anything created since last visit is NEW.
+  const stored = localStorage.getItem('salonLastSeen');
+  newBaseline = stored ? Number(stored) : Date.now(); // first-ever visit flags nothing
+  localStorage.setItem('salonLastSeen', String(Date.now()));
+
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
